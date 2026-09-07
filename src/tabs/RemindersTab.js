@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import Modal from "../components/Modal";
+import DateField from "../components/DateField";
 import { REMINDER_ICONS } from "../data";
 import {
   effectivePriority, fmtDate, fmtKm, kmLeftLabel, nextId, num, todayISO,
@@ -222,9 +223,9 @@ export default function RemindersTab({ reminders, setReminders, currentKm }) {
               </div>
               <div className="field">
                 <label>Срок, дата</label>
-                <input
-                  type="date"
-                  value={form.dueDate} onChange={(e) => setField("dueDate", e.target.value)}
+                <DateField
+                  label="Срок, дата"
+                  value={form.dueDate} onChange={(v) => setField("dueDate", v)}
                 />
               </div>
             </div>

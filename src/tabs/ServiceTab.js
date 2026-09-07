@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import Modal from "../components/Modal";
+import DateField from "../components/DateField";
 import { CATEGORY_COLORS, CATEGORY_LABELS } from "../data";
 import { byDateDesc, fmtDate, fmtKm, fmtMoney, nextId, num } from "../utils";
 
@@ -160,7 +161,7 @@ export default function ServiceTab({ service, setService }) {
             <div className="form-row">
               <div className="field">
                 <label>Дата</label>
-                <input type="date" value={form.date} onChange={(e) => setField("date", e.target.value)} />
+                <DateField label="Дата" value={form.date} onChange={(v) => setField("date", v)} />
               </div>
               <div className="field">
                 <label>Пробег, км</label>

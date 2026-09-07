@@ -401,13 +401,42 @@ button, input, select, textarea {
 }
 .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--gold); }
 
-/* iOS Safari даёт input[type=date] широкий intrinsic-размер, который
-   не сжимается в grid-колонке 1fr, если у неё min-width остаётся auto —
-   поле съезжает под соседнюю колонку */
-.field input[type="date"] {
+/* Поле даты: видимый текстовый input + прозрачный нативный date-input сверху.
+   iOS Safari/WebKit даёт input[type=date] собственную широкую intrinsic-ширину,
+   которую не сжимает ни 1fr, ни min-width: 0 — поле физически заезжало под
+   соседнюю колонку. Нативный контрол убран из потока (position: absolute),
+   поэтому на layout он больше не влияет, но остаётся кликабельным и открывает
+   штатный iOS date picker. */
+.datefield {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 10px;
+}
+.datefield__display {
+  pointer-events: none;
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+.datefield__native {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   min-width: 0;
   -webkit-min-logical-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: transparent;
+  opacity: 0;
+  -webkit-appearance: none;
+  appearance: none;
 }
+.datefield:focus-within .datefield__display { border-color: var(--gold); }
 
 .form-row {
   display: grid;

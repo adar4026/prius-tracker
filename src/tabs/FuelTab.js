@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import Modal from "../components/Modal";
+import DateField from "../components/DateField";
 import {
   byDateDesc, byKmAsc, calcConsumption, fmtDate, fmtKm, fmtMoney, fmtNum,
   isFull, nextId, num, recalcFrom, todayISO,
@@ -196,7 +197,7 @@ export default function FuelTab({ fuel, setFuel }) {
             <div className="form-row">
               <div className="field">
                 <label>Дата</label>
-                <input type="date" value={form.date} onChange={(e) => setField("date", e.target.value)} />
+                <DateField label="Дата" value={form.date} onChange={(v) => setField("date", v)} />
               </div>
               <div className="field">
                 <label>Пробег, км</label>
