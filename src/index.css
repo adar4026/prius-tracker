@@ -624,3 +624,5 @@ button, input, select, textarea {
 
 .modal .card + .btn,
 .modal .btn + .section-title { margin-top: 14px; }
+
+.row__countdown { font-weight: 600; margin-top: 4px; }

@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 import Modal from "../components/Modal";
 import { REMINDER_ICONS } from "../data";
-import { effectivePriority, fmtDate, fmtKm, nextId, num, todayISO } from "../utils";
+import {
+  effectivePriority, fmtDate, fmtKm, kmLeftLabel, nextId, num, todayISO,
+} from "../utils";
 
 const GROUPS = [
   { id: "overdue",   title: "Просрочено",        color: "var(--red)" },
@@ -110,7 +112,10 @@ export default function RemindersTab({ reminders, setReminders, currentKm }) {
 
             {items.map((r) => {
               const overdue = g.id === "overdue";
-              const kmLeft = !r.completed && r.dueKm ? r.dueKm - currentKm : null;
+              const left = kmLeftLabel(r, currentKm);
+              // срок по дате прошёл — показываем явно, даже если запас по пробегу ещё есть
+              const dateOverdue =
+                !r.completed && r.dueDate && todayISO() > r.dueDate;
               return (
                 <div
                   key={r.id}
@@ -127,13 +132,28 @@ export default function RemindersTab({ reminders, setReminders, currentKm }) {
                         {r.completedKm ? ` • ${fmtKm(r.completedKm)} км` : ""}
                       </div>
                     ) : (
-                      (r.dueKm || r.dueDate) && (
-                        <div className="row__sub" style={{ marginTop: 5 }}>
-                          {r.dueKm && <>🎯 {fmtKm(r.dueKm)} км</>}
-                          {r.dueKm && r.dueDate && " • "}
-                          {r.dueDate && <>📅 {fmtDate(r.dueDate)}</>}
-                        </div>
-                      )
+                      <>
+                        {(r.dueKm || r.dueDate) && (
+                          <div className="row__sub" style={{ marginTop: 5 }}>
+                            {r.dueKm && <>🎯 {fmtKm(r.dueKm)} км</>}
+                            {r.dueKm && r.dueDate && " • "}
+                            {r.dueDate && <>📅 {fmtDate(r.dueDate)}</>}
+                          </div>
+                        )}
+                        {left && (
+                          <div
+                            className="row__sub row__countdown"
+                            style={{ color: left.overdue ? "var(--red)" : "var(--gold)" }}
+                          >
+                            {left.text}
+                          </div>
+                        )}
+                        {dateOverdue && (
+                          <div className="row__sub row__countdown" style={{ color: "var(--red)" }}>
+                            Срок прошёл {fmtDate(r.dueDate)}
+                          </div>
+                        )}
+                      </>
                     )}
 
                     <div className="row__actions row__actions--left">
@@ -145,17 +165,6 @@ export default function RemindersTab({ reminders, setReminders, currentKm }) {
                     </div>
                   </div>
 
-                  {kmLeft !== null && (
-                    <div className="row__right">
-                      <div
-                        className="row__value row__value--small"
-                        style={{ color: kmLeft <= 0 ? "var(--red)" : "var(--muted)" }}
-                      >
-                        {kmLeft > 0 ? `+${fmtKm(kmLeft)}` : fmtKm(kmLeft)}
-                      </div>
-                      <div className="row__sub">км</div>
-                    </div>
-                  )}
                 </div>
               );
             })}

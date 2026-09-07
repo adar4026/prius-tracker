@@ -61,7 +61,7 @@ export const INITIAL_SERVICE = [
 ];
 
 export const INITIAL_REMINDERS = [
-  { id:1, title:"Моторное масло 0W-20", icon:"🔧", dueKm:221000, dueDate:"2026-09-15", priority:"overdue", note:"ПРОСРОЧЕНО! Сейчас 220.684 км", completed:false, completedDate:null, completedKm:null },
+  { id:1, title:"Моторное масло 0W-20", icon:"🔧", dueKm:221000, dueDate:"2026-09-15", priority:"upcoming", note:"Осталось ~316 км до замены масла", completed:false, completedDate:null, completedKm:null },
   { id:2, title:"Тормозная жидкость DOT4", icon:"💧", dueKm:233000, dueDate:"2026-09-04", priority:"upcoming", note:"Через ~12.000 км", completed:false, completedDate:null, completedKm:null },
   { id:3, title:"Суппорт тормозной", icon:"🛑", dueKm:null, dueDate:null, priority:"pending", note:"Куплен (56€), не установлен", completed:false, completedDate:null, completedKm:null },
   { id:4, title:"Задние амортизаторы KYB", icon:"🚗", dueKm:null, dueDate:null, priority:"pending", note:"Куплены (66,43€), не установлены", completed:false, completedDate:null, completedKm:null },

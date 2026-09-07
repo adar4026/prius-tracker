@@ -189,9 +189,32 @@ export function avg(values) {
 
 /* ---------------- задачи ---------------- */
 
-/** Раздел задачи. Выполненная задача не может быть просроченной. */
+/**
+ * Просрочена ли задача. Считается всегда динамически:
+ * по пробегу (currentKm >= dueKm) или по дате (сегодня позже dueDate).
+ * Выполненная задача просроченной не бывает.
+ */
+export const isReminderOverdue = (r, currentKm) => {
+  if (r.completed) return false;
+  if (r.dueKm && currentKm >= r.dueKm) return true;
+  if (r.dueDate && todayISO() > r.dueDate) return true;
+  return false;
+};
+
+/** Раздел задачи. */
 export const effectivePriority = (r, currentKm) => {
   if (r.completed) return "completed";
-  if (r.dueKm && currentKm >= r.dueKm) return "overdue";
+  if (isReminderOverdue(r, currentKm)) return "overdue";
+  // сохранённый "overdue" не должен залипать, пока срок не наступил
+  if (r.priority === "overdue") return "upcoming";
   return r.priority;
+};
+
+/** Динамический текст остатка до срока: dueKm - currentKm */
+export const kmLeftLabel = (r, currentKm) => {
+  if (r.completed || !r.dueKm) return null;
+  const left = r.dueKm - currentKm;
+  if (left > 0) return { text: `Осталось ${fmtKm(left)} км`, overdue: false };
+  if (left === 0) return { text: "Срок наступил", overdue: true };
+  return { text: `Просрочено на ${fmtKm(-left)} км`, overdue: true };
 };
