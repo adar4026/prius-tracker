@@ -1,27 +1,40 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Modal from "../components/Modal";
 import DateField from "../components/DateField";
 import JournalFilter from "../components/JournalFilter";
-import { CATEGORY_COLORS, CATEGORY_LABELS } from "../data";
+import NextServiceFields from "../components/NextServiceFields";
+import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS } from "../data";
 import {
-  byDateDesc, entryYear, fmtDate, fmtKm, fmtMoney, matchesQuery, nextId, num,
-  numOrNull, serviceSearchText, yearsOf,
+  addMonths, byDateDesc, entryYear, fmtDate, fmtKm, fmtMoney, matchesQuery,
+  nextId, num, numOrNull, serviceSearchText, todayISO, yearsOf,
 } from "../utils";
 
 const CATS = Object.keys(CATEGORY_LABELS);
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => todayISO();
 
 const emptyForm = () => ({
   date: today(), km: "", type: "", cost: "", note: "", category: "oil",
+  // блок «Следующая замена»
+  planNext: false, intervalKm: "", intervalMonths: "", nextKm: "", nextDate: "",
+  nextKmTouched: false, nextDateTouched: false,
 });
 
-export default function ServiceTab({ service, setService, year, onYear }) {
+/** Задача, созданная из этой сервисной записи (связь живёт на стороне задачи). */
+export const linkedReminder = (reminders, serviceId) =>
+  reminders.find((r) => r.sourceServiceId === serviceId) || null;
+
+export default function ServiceTab({
+  service, setService, reminders, setReminders, currentKm,
+  year, onYear, draft, onDraftUsed,
+}) {
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null); // редактируемая запись или null
   const [form, setForm] = useState(emptyForm());
   const [error, setError] = useState("");
+  // задача, которую закроет сохраняемая запись (сценарий «Выполнить»)
+  const [draftReminderId, setDraftReminderId] = useState(null);
 
   const sorted = useMemo(() => [...service].sort(byDateDesc), [service]);
 
@@ -53,33 +66,90 @@ export default function ServiceTab({ service, setService, year, onYear }) {
   const free = visible.filter((r) => numOrNull(r.cost) === 0).length;
   const unknown = visible.filter((r) => numOrNull(r.cost) === null).length;
 
-  const setField = (name, value) => setForm((f) => ({ ...f, [name]: value }));
+  /**
+   * Пробег и дата следующей замены пересчитываются от интервала, но только
+   * пока пользователь не исправил их руками — иначе ручное значение затиралось
+   * бы при любой правке даты или пробега.
+   */
+  const setField = (name, value) =>
+    setForm((f) => {
+      const next = { ...f, [name]: value };
+      if (name === "nextKm") next.nextKmTouched = true;
+      if (name === "nextDate") next.nextDateTouched = true;
+      // выбор интервала — явное намерение пересчитать, ручная правка снимается
+      if (name === "intervalKm") next.nextKmTouched = false;
+      if (name === "intervalMonths") next.nextDateTouched = false;
 
-  const openAdd = () => {
+      const recalc = ["km", "date", "intervalKm", "intervalMonths", "planNext"];
+      if (recalc.includes(name) && next.planNext) {
+        const baseKm = Math.round(num(next.km));
+        const stepKm = Math.round(num(next.intervalKm));
+        if (!next.nextKmTouched && baseKm > 0 && stepKm > 0) {
+          next.nextKm = String(baseKm + stepKm);
+        }
+        const months = Math.round(num(next.intervalMonths));
+        if (!next.nextDateTouched && next.date && months > 0) {
+          next.nextDate = addMonths(next.date, months) || "";
+        }
+      }
+      return next;
+    });
+
+  const openAdd = (prefill = null) => {
     setEditing(null);
-    setForm(emptyForm());
+    setForm({ ...emptyForm(), ...(prefill || {}) });
     setError("");
     setOpen(true);
   };
 
   const openEdit = (item) => {
+    const linked = linkedReminder(reminders, item.id);
     setEditing(item);
     setForm({
+      ...emptyForm(),
       date: item.date,
       km: item.km ? String(item.km) : "",
       type: item.type,
       cost: item.cost === null || item.cost === undefined ? "" : String(item.cost),
       note: item.note || "",
       category: item.category,
+      // план следующей замены хранится в связанной задаче, а не дублируется в ТО
+      planNext: !!linked,
+      intervalKm: linked?.intervalKm ? String(linked.intervalKm) : "",
+      intervalMonths: linked?.intervalMonths ? String(linked.intervalMonths) : "",
+      nextKm: linked?.dueKm ? String(linked.dueKm) : "",
+      nextDate: linked?.dueDate || "",
+      // «тронуто» только если сохранённая цель не совпадает с расчётом
+      // по интервалу — тогда её не перезаписываем
+      nextKmTouched: !(
+        linked?.intervalKm && item.km && linked.dueKm === item.km + linked.intervalKm
+      ),
+      nextDateTouched: !(
+        linked?.intervalMonths && linked.dueDate === addMonths(item.date, linked.intervalMonths)
+      ),
     });
     setError("");
     setOpen(true);
   };
 
+  // «Выполнить» из раздела «Задачи» открывает форму с подставленным названием
+  useEffect(() => {
+    if (!draft) return;
+    openAdd(draft.form);
+    setDraftReminderId(draft.reminderId || null);
+    onDraftUsed();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft]);
+
   const submit = (e) => {
     e.preventDefault();
     if (!form.date) return setError("Укажите дату");
     if (!form.type.trim()) return setError("Укажите вид работ");
+
+    const nextKm = form.nextKm === "" ? null : Math.round(num(form.nextKm));
+    const nextDate = form.nextDate || null;
+    if (form.planNext && !nextKm && !nextDate)
+      return setError("Укажите следующий пробег или следующую дату");
 
     const entry = {
       id: editing ? editing.id : nextId(service),
@@ -96,19 +166,105 @@ export default function ServiceTab({ service, setService, year, onYear }) {
         ? service.map((s) => (s.id === editing.id ? entry : s))
         : [...service, entry]
     );
+
+    syncReminder(entry, { nextKm, nextDate });
     setOpen(false);
+  };
+
+  /**
+   * Приводит связанную задачу в соответствие с сохранённой записью ТО.
+   * Существующая задача обновляется, а не дублируется; выполненная задача
+   * своё «выполнено» не теряет. Выключенный план удаляет только незакрытую
+   * задачу — историю выполненных не трогаем.
+   */
+  const syncReminder = (entry, { nextKm, nextDate }) => {
+    const linked = linkedReminder(reminders, entry.id);
+    const closing = draftReminderId; // задача, которую закрывает эта запись
+
+    setReminders((list) => {
+      let out = list;
+
+      if (form.planNext) {
+        const fields = {
+          title: entry.type,
+          icon: CATEGORY_ICONS[entry.category] || "🔧",
+          dueKm: nextKm,
+          dueDate: nextDate,
+          intervalKm: numOrNull(form.intervalKm),
+          intervalMonths: numOrNull(form.intervalMonths),
+          sourceServiceId: entry.id,
+        };
+        out = linked
+          ? out.map((r) => (r.id === linked.id ? { ...r, ...fields } : r))
+          : [
+              ...out,
+              {
+                id: nextId(out),
+                priority: "upcoming",
+                note: "",
+                completed: false,
+                completedDate: null,
+                completedKm: null,
+                completedServiceId: null,
+                ...fields,
+              },
+            ];
+      } else if (linked && !linked.completed) {
+        out = out.filter((r) => r.id !== linked.id);
+      }
+
+      // запись создана кнопкой «Выполнить» — закрываем исходную задачу
+      if (closing) {
+        out = out.map((r) =>
+          r.id === closing
+            ? {
+                ...r,
+                completed: true,
+                completedDate: entry.date,
+                completedKm: entry.km,
+                completedServiceId: entry.id,
+              }
+            : r
+        );
+      }
+      return out;
+    });
+
+    setDraftReminderId(null);
   };
 
   const remove = (id) => {
     const item = service.find((s) => s.id === id);
-    if (window.confirm(`Удалить запись «${item.type}»?`)) {
-      setService(service.filter((s) => s.id !== id));
+    const linked = linkedReminder(reminders, id);
+    const closed = reminders.filter((r) => r.completedServiceId === id);
+
+    let question = `Удалить запись «${item.type}»?`;
+    if (linked && !linked.completed) {
+      question += `\n\nСвязанная задача «${linked.title}» тоже будет удалена.`;
+    } else if (linked) {
+      question += `\n\nСвязанная задача «${linked.title}» выполнена — она останется в истории, связь будет снята.`;
     }
+    if (closed.length) {
+      question += `\n\nУ ${closed.length} выполненной задачи снимется отметка о закрывшей её записи.`;
+    }
+    if (!window.confirm(question)) return;
+
+    setService(service.filter((s) => s.id !== id));
+    // битых ссылок не оставляем ни в одну сторону
+    setReminders((list) =>
+      list
+        .filter((r) => !(r.sourceServiceId === id && !r.completed))
+        .map((r) => ({
+          ...r,
+          sourceServiceId: r.sourceServiceId === id ? null : r.sourceServiceId,
+          completedServiceId: r.completedServiceId === id ? null : r.completedServiceId,
+        }))
+    );
   };
 
   return (
     <main className="screen">
-      <button className="btn" onClick={openAdd}>+ Добавить запись</button>
+      <button className="btn" onClick={() => openAdd()}>+ Добавить запись</button>
 
       <JournalFilter
         years={years}
@@ -183,6 +339,17 @@ export default function ServiceTab({ service, setService, year, onYear }) {
                 </span>
               </div>
               {s.note && <div className="row__sub">{s.note}</div>}
+              {(() => {
+                const linked = linkedReminder(reminders, s.id);
+                if (!linked) return null;
+                return (
+                  <div className="row__sub" style={{ color: "var(--gold)" }}>
+                    🔔 Следующая: {linked.dueKm ? `${fmtKm(linked.dueKm)} км` : ""}
+                    {linked.dueKm && linked.dueDate ? " • " : ""}
+                    {linked.dueDate ? fmtDate(linked.dueDate) : ""}
+                  </div>
+                );
+              })()}
             </div>
             <div className="row__right">
               <div
@@ -255,6 +422,16 @@ export default function ServiceTab({ service, setService, year, onYear }) {
                 value={form.note} onChange={(e) => setField("note", e.target.value)}
               />
             </div>
+
+            <NextServiceFields
+              form={form}
+              setField={setField}
+              linkedDone={
+                editing && linkedReminder(reminders, editing.id)
+                  ? linkedReminder(reminders, editing.id).completed
+                  : null
+              }
+            />
 
             {error && <div className="hint" style={{ color: "var(--red)" }}>{error}</div>}
 

@@ -128,12 +128,24 @@ export const migrateService = (list) =>
     note: s.note || "",
   }));
 
+/**
+ * Задачи. Поля связи с ТО добавляются аддитивно: у старых задач они null,
+ * и такая задача ведёт себя ровно как раньше — обычное напоминание без
+ * привязки к сервисной записи.
+ */
 export const migrateReminders = (list) =>
   (Array.isArray(list) ? list : []).map((r) => ({
     ...r,
     completed: !!r.completed,
     completedDate: r.completedDate || null,
     completedKm: Number.isFinite(r.completedKm) ? r.completedKm : null,
+    // из какой сервисной записи задача создана
+    sourceServiceId: r.sourceServiceId ?? null,
+    // какой сервисной записью задача закрыта
+    completedServiceId: r.completedServiceId ?? null,
+    // интервал, которым посчитан срок
+    intervalKm: numOrNull(r.intervalKm),
+    intervalMonths: numOrNull(r.intervalMonths),
   }));
 
 /* ---------------- расход ---------------- */
@@ -211,26 +223,102 @@ export function avg(values) {
 
 /* ---------------- задачи ---------------- */
 
+/** Пороги статуса «Скоро». Меняются здесь и нигде больше. */
+export const DUE_SOON_KM = 1000;
+export const DUE_SOON_DAYS = 30;
+
+/** Сколько дней осталось до даты: 0 — сегодня, отрицательное — срок прошёл. */
+export const daysUntil = (iso) => {
+  if (!iso) return null;
+  const today = Date.parse(`${todayISO()}T00:00:00Z`);
+  const due = Date.parse(`${iso}T00:00:00Z`);
+  if (Number.isNaN(due)) return null;
+  return Math.round((due - today) / 86400000);
+};
+
+/**
+ * Дата через N месяцев. 31 января + 1 месяц даёт 28/29 февраля,
+ * а не перескок на март.
+ */
+export function addMonths(iso, months) {
+  if (!iso || !Number.isFinite(months)) return null;
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  const shifted = new Date(Date.UTC(y, m - 1 + months, 1));
+  const lastDay = new Date(
+    Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth() + 1, 0)
+  ).getUTCDate();
+  shifted.setUTCDate(Math.min(d, lastDay));
+  return shifted.toISOString().slice(0, 10);
+}
+
 /**
  * Просрочена ли задача. Считается всегда динамически:
- * по пробегу (currentKm >= dueKm) или по дате (сегодня позже dueDate).
+ * по пробегу (currentKm >= dueKm) или по наступившей дате (сегодня >= dueDate).
  * Выполненная задача просроченной не бывает.
  */
 export const isReminderOverdue = (r, currentKm) => {
   if (r.completed) return false;
   if (r.dueKm && currentKm >= r.dueKm) return true;
-  if (r.dueDate && todayISO() > r.dueDate) return true;
+  if (r.dueDate && todayISO() >= r.dueDate) return true;
   return false;
 };
 
-/** Раздел задачи. */
-export const effectivePriority = (r, currentKm) => {
-  if (r.completed) return "completed";
+/**
+ * Статус задачи: done | overdue | soon | waiting.
+ * Если заданы оба условия, срабатывает то, которое наступит раньше.
+ */
+export function reminderStatus(r, currentKm) {
+  if (r.completed) return "done";
   if (isReminderOverdue(r, currentKm)) return "overdue";
-  // сохранённый "overdue" не должен залипать, пока срок не наступил
-  if (r.priority === "overdue") return "upcoming";
-  return r.priority;
-};
+  const kmLeft = r.dueKm ? r.dueKm - currentKm : null;
+  const dLeft = daysUntil(r.dueDate);
+  if ((kmLeft !== null && kmLeft <= DUE_SOON_KM) || (dLeft !== null && dLeft <= DUE_SOON_DAYS))
+    return "soon";
+  return "waiting";
+}
+
+/**
+ * Насколько задача срочная: чем меньше, тем ближе срок.
+ * Пробег и дни приводятся к общей шкале через пороги «Скоро», поэтому
+ * у задачи с двумя условиями побеждает то, что действительно ближе.
+ * null — срока нет вовсе.
+ */
+export function reminderUrgency(r, currentKm) {
+  const scales = [];
+  if (r.dueKm) scales.push((r.dueKm - currentKm) / DUE_SOON_KM);
+  const dLeft = daysUntil(r.dueDate);
+  if (dLeft !== null) scales.push(dLeft / DUE_SOON_DAYS);
+  return scales.length ? Math.min(...scales) : null;
+}
+
+/** Ближайшее из двух условий — то, что показывается в списке одной строкой. */
+export function nearestDueLabel(r, currentKm) {
+  if (r.completed) return null;
+  const kmLeft = r.dueKm ? r.dueKm - currentKm : null;
+  const dLeft = daysUntil(r.dueDate);
+  const byKm = kmLeft !== null ? kmLeft / DUE_SOON_KM : Infinity;
+  const byDay = dLeft !== null ? dLeft / DUE_SOON_DAYS : Infinity;
+  if (byKm === Infinity && byDay === Infinity) return null;
+
+  if (byKm <= byDay) {
+    if (kmLeft > 0) return { text: `через ${fmtKm(kmLeft)} км`, overdue: false };
+    if (kmLeft === 0) return { text: "пробег достигнут", overdue: true };
+    return { text: `просрочено на ${fmtKm(-kmLeft)} км`, overdue: true };
+  }
+  if (dLeft > 0) return { text: `через ${dLeft} ${plural(dLeft, "день", "дня", "дней")}`, overdue: false };
+  if (dLeft === 0) return { text: "срок сегодня", overdue: true };
+  return { text: `просрочено на ${-dLeft} ${plural(-dLeft, "день", "дня", "дней")}`, overdue: true };
+}
+
+function plural(n, one, few, many) {
+  const a = Math.abs(n) % 100;
+  const b = a % 10;
+  if (a > 10 && a < 20) return many;
+  if (b > 1 && b < 5) return few;
+  if (b === 1) return one;
+  return many;
+}
 
 /** Динамический текст остатка до срока: dueKm - currentKm */
 export const kmLeftLabel = (r, currentKm) => {

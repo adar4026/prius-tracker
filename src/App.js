@@ -11,8 +11,9 @@ import { KEYS, usePersistentState } from "./storage";
 import { INITIAL_FUEL, INITIAL_SERVICE, INITIAL_REMINDERS } from "./data";
 import { HISTORY_IMPORTS, applyFuelBatch, applyServiceBatch } from "./history";
 import { THEMES, THEME_META } from "./themes";
+import { CATEGORY_ICONS } from "./data";
 import {
-  effectivePriority, fmtKm, migrateFuel, migrateReminders, migrateService,
+  fmtKm, migrateFuel, migrateReminders, migrateService, reminderStatus,
 } from "./utils";
 
 const TABS = [
@@ -30,6 +31,8 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   // выбранный год общий для журналов, поэтому не сбрасывается при смене вкладки
   const [year, setYear] = useState(CURRENT_YEAR);
+  // заготовка формы ТО для сценария «Выполнить» из раздела «Задачи»
+  const [serviceDraft, setServiceDraft] = useState(null);
 
   const [theme, setTheme] = usePersistentState(KEYS.theme, "dark");
   const [fuel, setFuel] = usePersistentState(KEYS.fuel, INITIAL_FUEL, migrateFuel);
@@ -72,8 +75,30 @@ export default function App() {
 
   // красный бейдж считает только невыполненные просроченные задачи
   const overdue = useMemo(
-    () => reminders.filter((r) => effectivePriority(r, currentKm) === "overdue").length,
+    () => reminders.filter((r) => reminderStatus(r, currentKm) === "overdue").length,
     [reminders, currentKm]
+  );
+
+  /**
+   * «Выполнить» в задаче открывает форму нового ТО с подставленным названием.
+   * Категория берётся из исходной сервисной записи, если задача создана из неё.
+   */
+  const completeReminder = useCallback(
+    (reminder) => {
+      const source = reminder.sourceServiceId
+        ? service.find((s) => s.id === reminder.sourceServiceId)
+        : null;
+      const category =
+        source?.category ||
+        Object.keys(CATEGORY_ICONS).find((c) => CATEGORY_ICONS[c] === reminder.icon) ||
+        "oil";
+      setServiceDraft({
+        reminderId: reminder.id,
+        form: { type: reminder.title, category },
+      });
+      setTab("service");
+    },
+    [service]
   );
 
   const importData = useCallback(
@@ -112,13 +137,25 @@ export default function App() {
       )}
       {tab === "charts" && <ChartsTab fuel={fuel} theme={safeTheme} />}
       {tab === "service" && (
-        <ServiceTab service={service} setService={setService} year={year} onYear={setYear} />
+        <ServiceTab
+          service={service}
+          setService={setService}
+          reminders={reminders}
+          setReminders={setReminders}
+          currentKm={currentKm}
+          year={year}
+          onYear={setYear}
+          draft={serviceDraft}
+          onDraftUsed={() => setServiceDraft(null)}
+        />
       )}
       {tab === "reminders" && (
         <RemindersTab
           reminders={reminders}
           setReminders={setReminders}
+          service={service}
           currentKm={currentKm}
+          onComplete={completeReminder}
         />
       )}
 

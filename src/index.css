@@ -374,6 +374,20 @@ button, input, select, textarea {
 }
 .btn:active { opacity: 0.7; }
 
+/* компактная кнопка внутри строки задачи — .btn задаёт width:100%,
+   поэтому объявляется после него */
+.btn--mini {
+  display: inline-flex;
+  flex: none;
+  width: auto;
+  padding: 5px 12px;
+  margin-right: 6px;
+  border-radius: 999px;
+  border: 1px solid var(--gold);
+  border-style: solid;
+  font-size: 12px;
+}
+
 .btn--solid {
   border: 1px solid var(--gold);
   background: var(--gold);

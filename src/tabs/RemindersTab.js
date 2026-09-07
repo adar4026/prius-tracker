@@ -1,18 +1,28 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import Modal from "../components/Modal";
 import DateField from "../components/DateField";
 import { REMINDER_ICONS } from "../data";
 import {
-  effectivePriority, fmtDate, fmtKm, kmLeftLabel, nextId, num, todayISO,
+  fmtDate, fmtKm, nearestDueLabel, nextId, num, reminderStatus, reminderUrgency,
+  todayISO,
 } from "../utils";
 
-const GROUPS = [
-  { id: "overdue",   title: "Просрочено",        color: "var(--red)" },
-  { id: "upcoming",  title: "Запланировано",     color: "var(--gold)" },
-  { id: "pending",   title: "Ожидают установки", color: "var(--blue)" },
-  { id: "info",      title: "Информация",        color: "var(--muted)" },
-  { id: "completed", title: "Выполненные",       color: "var(--green)" },
+const STATUSES = [
+  { id: "all",      label: "Все",        color: "var(--gold)" },
+  { id: "overdue",  label: "Просрочено", color: "var(--red)" },
+  { id: "soon",     label: "Скоро",      color: "var(--gold)" },
+  { id: "waiting",  label: "Ожидает",    color: "var(--blue)" },
+  { id: "done",     label: "Выполнено",  color: "var(--green)" },
 ];
+
+const STATUS_META = {
+  overdue: { label: "Просрочено", color: "var(--red)" },
+  soon:    { label: "Скоро",      color: "var(--gold)" },
+  waiting: { label: "Ожидает",    color: "var(--blue)" },
+  done:    { label: "Выполнено",  color: "var(--green)" },
+};
+
+const RANK = { overdue: 0, soon: 1, waiting: 2, done: 4 };
 
 const PRIORITIES = [
   { id: "upcoming", label: "Запланировано" },
@@ -25,11 +35,47 @@ const emptyForm = () => ({
   title: "", icon: "🔧", priority: "upcoming", dueKm: "", dueDate: "", note: "",
 });
 
-export default function RemindersTab({ reminders, setReminders, currentKm }) {
+export default function RemindersTab({
+  reminders, setReminders, service, currentKm, onComplete,
+}) {
+  const [filter, setFilter] = useState("all");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm());
   const [error, setError] = useState("");
+
+  const withStatus = useMemo(
+    () =>
+      reminders.map((r) => ({
+        ...r,
+        status: reminderStatus(r, currentKm),
+        urgency: reminderUrgency(r, currentKm),
+      })),
+    [reminders, currentKm]
+  );
+
+  const counts = useMemo(() => {
+    const map = { all: withStatus.length };
+    withStatus.forEach((r) => { map[r.status] = (map[r.status] || 0) + 1; });
+    return map;
+  }, [withStatus]);
+
+  /**
+   * Порядок: просроченные, ближайшие, остальные, выполненные внизу.
+   * Задача без срока идёт после задач со сроком, но выше выполненных.
+   */
+  const visible = useMemo(() => {
+    const rank = (r) => (r.urgency === null && r.status !== "done" ? 3 : RANK[r.status]);
+    return withStatus
+      .filter((r) => filter === "all" || r.status === filter)
+      .sort((a, b) => {
+        if (rank(a) !== rank(b)) return rank(a) - rank(b);
+        if (a.urgency !== null && b.urgency !== null) return a.urgency - b.urgency;
+        if (a.urgency !== null) return -1;
+        if (b.urgency !== null) return 1;
+        return (b.completedDate || "").localeCompare(a.completedDate || "");
+      });
+  }, [withStatus, filter]);
 
   const setField = (name, value) => setForm((f) => ({ ...f, [name]: value }));
 
@@ -59,6 +105,11 @@ export default function RemindersTab({ reminders, setReminders, currentKm }) {
     if (!form.title.trim()) return setError("Укажите название задачи");
 
     const entry = {
+      // связи с ТО правятся из формы ТО, здесь они только сохраняются
+      ...(editing || {
+        sourceServiceId: null, completedServiceId: null,
+        intervalKm: null, intervalMonths: null,
+      }),
       id: editing ? editing.id : nextId(reminders),
       title: form.title.trim(),
       icon: form.icon,
@@ -85,7 +136,7 @@ export default function RemindersTab({ reminders, setReminders, currentKm }) {
         x.id !== r.id
           ? x
           : x.completed
-          ? { ...x, completed: false, completedDate: null, completedKm: null }
+          ? { ...x, completed: false, completedDate: null, completedKm: null, completedServiceId: null }
           : { ...x, completed: true, completedDate: todayISO(), completedKm: currentKm || null }
       )
     );
@@ -101,75 +152,89 @@ export default function RemindersTab({ reminders, setReminders, currentKm }) {
     <main className="screen">
       <button className="btn" onClick={openAdd}>+ Добавить задачу</button>
 
-      {GROUPS.map((g) => {
-        const items = reminders.filter((r) => effectivePriority(r, currentKm) === g.id);
-        if (!items.length) return null;
+      <div className="chip-row" style={{ marginTop: 14 }}>
+        {STATUSES.map((st) => (
+          <button
+            key={st.id}
+            className={`chip ${filter === st.id ? "chip--active" : ""}`}
+            onClick={() => setFilter(st.id)}
+            style={filter === st.id && st.id !== "all"
+              ? { background: st.color, borderColor: st.color }
+              : undefined}
+          >
+            {st.label} · {counts[st.id] || 0}
+          </button>
+        ))}
+      </div>
+
+      {!visible.length && <div className="empty">Задач нет</div>}
+
+      {visible.map((r) => {
+        const meta = STATUS_META[r.status];
+        const left = nearestDueLabel(r, currentKm);
+        const source = r.sourceServiceId
+          ? service.find((s) => s.id === r.sourceServiceId)
+          : null;
 
         return (
-          <section key={g.id}>
-            <div className="section-title" style={{ color: g.color }}>
-              {g.title} · {items.length}
-            </div>
+          <div
+            key={r.id}
+            className={`item reminder ${r.status === "overdue" ? "item--overdue" : ""} ${r.completed ? "item--done" : ""}`}
+          >
+            <span className="reminder__icon">{r.icon}</span>
+            <div className="row__main">
+              <div className="row__title">
+                {r.title}{" "}
+                <span className="badge" style={{ color: meta.color }}>{meta.label}</span>
+              </div>
+              {r.note && <div className="row__sub">{r.note}</div>}
 
-            {items.map((r) => {
-              const overdue = g.id === "overdue";
-              const left = kmLeftLabel(r, currentKm);
-              // срок по дате прошёл — показываем явно, даже если запас по пробегу ещё есть
-              const dateOverdue =
-                !r.completed && r.dueDate && todayISO() > r.dueDate;
-              return (
-                <div
-                  key={r.id}
-                  className={`item reminder ${overdue ? "item--overdue" : ""} ${r.completed ? "item--done" : ""}`}
-                >
-                  <span className="reminder__icon">{r.icon}</span>
-                  <div className="row__main">
-                    <div className="row__title">{r.title}</div>
-                    {r.note && <div className="row__sub">{r.note}</div>}
-
-                    {r.completed ? (
-                      <div className="row__sub" style={{ marginTop: 5, color: "var(--green)" }}>
-                        ✅ {fmtDate(r.completedDate)}
-                        {r.completedKm ? ` • ${fmtKm(r.completedKm)} км` : ""}
-                      </div>
-                    ) : (
-                      <>
-                        {(r.dueKm || r.dueDate) && (
-                          <div className="row__sub" style={{ marginTop: 5 }}>
-                            {r.dueKm && <>🎯 {fmtKm(r.dueKm)} км</>}
-                            {r.dueKm && r.dueDate && " • "}
-                            {r.dueDate && <>📅 {fmtDate(r.dueDate)}</>}
-                          </div>
-                        )}
-                        {left && (
-                          <div
-                            className="row__sub row__countdown"
-                            style={{ color: left.overdue ? "var(--red)" : "var(--gold)" }}
-                          >
-                            {left.text}
-                          </div>
-                        )}
-                        {dateOverdue && (
-                          <div className="row__sub row__countdown" style={{ color: "var(--red)" }}>
-                            Срок прошёл {fmtDate(r.dueDate)}
-                          </div>
-                        )}
-                      </>
-                    )}
-
-                    <div className="row__actions row__actions--left">
-                      <button className="icon-btn" onClick={() => toggleDone(r)} title={r.completed ? "Вернуть в работу" : "Отметить выполненной"}>
-                        {r.completed ? "↩️" : "✅"}
-                      </button>
-                      <button className="icon-btn" onClick={() => openEdit(r)} aria-label="Изменить">✏️</button>
-                      <button className="icon-btn" onClick={() => remove(r)} aria-label="Удалить">🗑</button>
-                    </div>
-                  </div>
-
+              {source && (
+                <div className="row__sub">
+                  🔧 Предыдущее: {fmtDate(source.date)}
+                  {source.km ? ` • ${fmtKm(source.km)} км` : ""}
                 </div>
-              );
-            })}
-          </section>
+              )}
+
+              {r.completed ? (
+                <div className="row__sub" style={{ marginTop: 5, color: "var(--green)" }}>
+                  ✅ {fmtDate(r.completedDate)}
+                  {r.completedKm ? ` • ${fmtKm(r.completedKm)} км` : ""}
+                </div>
+              ) : (
+                <>
+                  {(r.dueKm || r.dueDate) && (
+                    <div className="row__sub" style={{ marginTop: 5 }}>
+                      {r.dueKm && <>🎯 {fmtKm(r.dueKm)} км</>}
+                      {r.dueKm && r.dueDate && " • "}
+                      {r.dueDate && <>📅 {fmtDate(r.dueDate)}</>}
+                    </div>
+                  )}
+                  {left && (
+                    <div
+                      className="row__sub row__countdown"
+                      style={{ color: left.overdue ? "var(--red)" : "var(--gold)" }}
+                    >
+                      {left.text}
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div className="row__actions row__actions--left">
+                {!r.completed && (
+                  <button className="btn btn--mini" onClick={() => onComplete(r)}>
+                    Выполнить
+                  </button>
+                )}
+                <button className="icon-btn" onClick={() => toggleDone(r)} title={r.completed ? "Вернуть в работу" : "Отметить выполненной"}>
+                  {r.completed ? "↩️" : "✅"}
+                </button>
+                <button className="icon-btn" onClick={() => openEdit(r)} aria-label="Изменить">✏️</button>
+                <button className="icon-btn" onClick={() => remove(r)} aria-label="Удалить">🗑</button>
+              </div>
+            </div>
+          </div>
         );
       })}
 
@@ -237,6 +302,13 @@ export default function RemindersTab({ reminders, setReminders, currentKm }) {
                 value={form.note} onChange={(e) => setField("note", e.target.value)}
               />
             </div>
+
+            {editing?.sourceServiceId && (
+              <div className="hint">
+                Задача связана с записью ТО — интервал и следующий срок удобнее
+                менять в самой записи.
+              </div>
+            )}
 
             {error && <div className="hint" style={{ color: "var(--red)" }}>{error}</div>}
 

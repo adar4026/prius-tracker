@@ -3,8 +3,8 @@ import Stat from "../components/Stat";
 import CarModal from "../components/CarModal";
 import { CAR } from "../data";
 import {
-  avg, byDateDesc, consumptionPoints, effectivePriority, fmtDate, fmtKm,
-  fmtMoney, fmtNum, kmLeftLabel, num,
+  avg, byDateDesc, consumptionPoints, fmtDate, fmtKm, fmtMoney, fmtNum,
+  kmLeftLabel, nearestDueLabel, num, reminderStatus, reminderUrgency,
 } from "../utils";
 
 function lastOilChange(service) {
@@ -33,9 +33,11 @@ export default function HomeTab({ fuel, service, reminders, currentKm, onGo }) {
   const oilLeft = dueKm !== null ? kmLeftLabel({ dueKm, completed: false }, currentKm) : null;
   const oilColor = !oilLeft ? "var(--muted)" : oilLeft.overdue ? "var(--red)" : dueKm - currentKm < 1500 ? "var(--gold)" : "var(--green)";
 
+  // ближайшее обслуживание: только активные задачи со сроком, самые срочные сверху
   const tasks = reminders
-    .filter((r) => ["overdue", "upcoming"].includes(effectivePriority(r, currentKm)))
-    .slice(0, 4);
+    .filter((r) => !r.completed && reminderUrgency(r, currentKm) !== null)
+    .sort((a, b) => reminderUrgency(a, currentKm) - reminderUrgency(b, currentKm))
+    .slice(0, 3);
 
   const recent = [...fuel].sort(byDateDesc).slice(0, 3);
   const lastFill = recent[0];
@@ -87,9 +89,10 @@ export default function HomeTab({ fuel, service, reminders, currentKm, onGo }) {
 
       {tasks.length > 0 && (
         <>
-          <div className="section-title">Ближайшие задачи</div>
+          <div className="section-title">Ближайшее обслуживание</div>
           {tasks.map((t) => {
-            const isOverdue = effectivePriority(t, currentKm) === "overdue";
+            const isOverdue = reminderStatus(t, currentKm) === "overdue";
+            const left = nearestDueLabel(t, currentKm);
             return (
               <div
                 key={t.id}
@@ -99,14 +102,20 @@ export default function HomeTab({ fuel, service, reminders, currentKm, onGo }) {
                 <span className="reminder__icon">{t.icon}</span>
                 <div className="row__main">
                   <div className="row__title">{t.title}</div>
-                  <div className="row__sub">{t.note}</div>
+                  <div className="row__sub">
+                    {t.dueKm ? `${fmtKm(t.dueKm)} км` : ""}
+                    {t.dueKm && t.dueDate ? " • " : ""}
+                    {t.dueDate ? fmtDate(t.dueDate) : ""}
+                  </div>
                 </div>
-                {t.dueKm && (
+                {left && (
                   <div className="row__right">
-                    <div className="row__value row__value--small" style={{ color: isOverdue ? "var(--red)" : "var(--muted)" }}>
-                      {fmtKm(t.dueKm)}
+                    <div
+                      className="row__value row__value--small"
+                      style={{ color: left.overdue ? "var(--red)" : "var(--gold)" }}
+                    >
+                      {left.text}
                     </div>
-                    <div className="row__sub">км</div>
                   </div>
                 )}
               </div>

@@ -84,6 +84,14 @@ export const CATEGORY_LABELS = {
   parts:"Запчасти", insurance:"Страховка", other:"Прочее"
 };
 
+// Иконка задачи, созданной из записи ТО. Только оформление —
+// на интервалы и сроки не влияет.
+export const CATEGORY_ICONS = {
+  oil:"🔧", fluid:"💧", brakes:"🛑", tires:"🛞", inspection:"📋",
+  battery:"🔋", suspension:"🚗", body:"🚙", parts:"⚙️",
+  insurance:"🛡️", other:"📌"
+};
+
 export const REMINDER_ICONS = ["🔧","💧","🛑","🚗","❄️","📋","🛡️","⚙️","🔋","🛞","🪫","📌"];
 
 export const CAR = {
