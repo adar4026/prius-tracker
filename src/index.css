@@ -391,6 +391,8 @@ button, input, select, textarea {
 }
 .field input, .field select, .field textarea {
   width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 11px 12px;
   border-radius: 10px;
   border: 1px solid var(--border);
@@ -399,7 +401,20 @@ button, input, select, textarea {
 }
 .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--gold); }
 
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+/* iOS Safari даёт input[type=date] широкий intrinsic-размер, который
+   не сжимается в grid-колонке 1fr, если у неё min-width остаётся auto —
+   поле съезжает под соседнюю колонку */
+.field input[type="date"] {
+  min-width: 0;
+  -webkit-min-logical-width: 0;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
+.form-row > .field { min-width: 0; }
 
 .form-actions { display: flex; gap: 10px; margin-top: 16px; }
 .form-actions .btn { flex: 1; }
