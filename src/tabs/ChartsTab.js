@@ -5,7 +5,7 @@ import {
 } from "recharts";
 import { chartColors } from "../themes";
 import {
-  avg, byKmAsc, consumptionPoints, fmtMoney, fmtNum, isPartial, monthLabel, num,
+  avg, byKmAsc, consumptionPoints, fmtMoney, fmtNum, isFull, monthLabel, num,
 } from "../utils";
 
 const MODES = [
@@ -46,7 +46,7 @@ export default function ChartsTab({ fuel, theme }) {
     () =>
       [...fuel]
         .sort(byKmAsc)
-        .map((f) => ({ label: shortDate(f.date), price: num(f.pricePerL), total: num(f.total) })),
+        .map((f) => ({ label: shortDate(f.date), price: num(f.pricePerL) })),
     [fuel]
   );
   const avgPrice = useMemo(() => avg(prices.map((p) => p.price)), [prices]);
@@ -57,10 +57,10 @@ export default function ChartsTab({ fuel, theme }) {
       const key = f.date.slice(0, 7);
       if (!map.has(key)) map.set(key, { key, label: monthLabel(f.date), spent: 0, liters: 0, fills: 0, cons: [] });
       const m = map.get(key);
-      m.spent += num(f.total);
+      m.spent += num(f.paidTotal);
       m.liters += num(f.liters);
       m.fills += 1;
-      if (!isPartial(f) && Number.isFinite(f.consumption) && f.consumption > 0) m.cons.push(f.consumption);
+      if (isFull(f) && Number.isFinite(f.consumption) && f.consumption > 0) m.cons.push(f.consumption);
     });
     return [...map.values()]
       .sort((a, b) => a.key.localeCompare(b.key))
@@ -123,14 +123,14 @@ export default function ChartsTab({ fuel, theme }) {
               <div className="stat__label">Минимум</div>
               <div className="stat__value" style={{ color: "var(--green)" }}>
                 {fmtNum(Math.min(...consumption.map((x) => x.consumption)), 2)}
-                <span className="stat__unit">л/100</span>
+                <span className="stat__unit">л/100 км</span>
               </div>
             </div>
             <div className="card stat">
               <div className="stat__label">Максимум</div>
               <div className="stat__value" style={{ color: "var(--red)" }}>
                 {fmtNum(Math.max(...consumption.map((x) => x.consumption)), 2)}
-                <span className="stat__unit">л/100</span>
+                <span className="stat__unit">л/100 км</span>
               </div>
             </div>
           </div>

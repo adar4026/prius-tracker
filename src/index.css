@@ -508,3 +508,119 @@ button, input, select, textarea {
 }
 .chart-legend span { display: flex; align-items: center; gap: 5px; }
 .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+
+/* ---------- шапка: несколько кнопок ---------- */
+
+.header__actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ---------- действия над записью ---------- */
+
+.row__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  margin-top: 4px;
+}
+.row__actions--left {
+  justify-content: flex-start;
+  margin-top: 8px;
+  margin-left: -4px;
+}
+
+.item--done { opacity: 0.68; }
+.item--done .row__title { text-decoration: line-through; }
+
+/* ---------- переключатель «полный бак» ---------- */
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  font-size: 14px;
+}
+
+.switch {
+  flex: none;
+  width: 46px;
+  height: 27px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--soft);
+  cursor: pointer;
+  position: relative;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+.switch--on {
+  background: var(--gold);
+  border-color: var(--gold);
+}
+.switch__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 0.18s ease, background 0.18s ease;
+}
+.switch--on .switch__knob {
+  transform: translateX(19px);
+  background: var(--bg);
+}
+
+/* ---------- выбор иконки задачи ---------- */
+
+.icon-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.icon-choice {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.icon-choice--active {
+  border-color: var(--gold);
+  background: var(--soft);
+}
+
+/* ---------- карточка автомобиля ---------- */
+
+.car-card {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.car-card__icon { font-size: 22px; line-height: 1; flex: none; }
+.car-card__main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.car-card__chevron { flex: none; color: var(--muted); font-size: 22px; line-height: 1; }
+
+/* ---------- вложенные карточки в модалке ---------- */
+
+.modal .card + .btn,
+.modal .btn + .section-title { margin-top: 14px; }

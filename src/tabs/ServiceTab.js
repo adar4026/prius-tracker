@@ -13,6 +13,7 @@ const emptyForm = () => ({
 export default function ServiceTab({ service, setService }) {
   const [filter, setFilter] = useState("all");
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(null); // редактируемая запись или null
   const [form, setForm] = useState(emptyForm());
   const [error, setError] = useState("");
 
@@ -27,23 +28,47 @@ export default function ServiceTab({ service, setService }) {
 
   const setField = (name, value) => setForm((f) => ({ ...f, [name]: value }));
 
+  const openAdd = () => {
+    setEditing(null);
+    setForm(emptyForm());
+    setError("");
+    setOpen(true);
+  };
+
+  const openEdit = (item) => {
+    setEditing(item);
+    setForm({
+      date: item.date,
+      km: item.km ? String(item.km) : "",
+      type: item.type,
+      cost: item.cost ? String(item.cost) : "",
+      note: item.note || "",
+      category: item.category,
+    });
+    setError("");
+    setOpen(true);
+  };
+
   const submit = (e) => {
     e.preventDefault();
     if (!form.date) return setError("Укажите дату");
     if (!form.type.trim()) return setError("Укажите вид работ");
 
-    setService([
-      ...service,
-      {
-        id: nextId(service),
-        date: form.date,
-        km: Math.round(num(form.km)),
-        type: form.type.trim(),
-        cost: num(form.cost),
-        note: form.note.trim(),
-        category: form.category,
-      },
-    ]);
+    const entry = {
+      id: editing ? editing.id : nextId(service),
+      date: form.date,
+      km: Math.round(num(form.km)),
+      type: form.type.trim(),
+      cost: num(form.cost),
+      note: form.note.trim(),
+      category: form.category,
+    };
+
+    setService(
+      editing
+        ? service.map((s) => (s.id === editing.id ? entry : s))
+        : [...service, entry]
+    );
     setOpen(false);
   };
 
@@ -56,12 +81,7 @@ export default function ServiceTab({ service, setService }) {
 
   return (
     <main className="screen">
-      <button
-        className="btn"
-        onClick={() => { setForm(emptyForm()); setError(""); setOpen(true); }}
-      >
-        + Добавить запись
-      </button>
+      <button className="btn" onClick={openAdd}>+ Добавить запись</button>
 
       <div className="chip-row" style={{ marginTop: 14 }}>
         <button
@@ -125,14 +145,17 @@ export default function ServiceTab({ service, setService }) {
               <div className="row__value" style={{ color: num(s.cost) ? "var(--text)" : "var(--green)" }}>
                 {num(s.cost) ? fmtMoney(s.cost, 2) : "0 €"}
               </div>
-              <button className="icon-btn" onClick={() => remove(s.id)} aria-label="Удалить">🗑</button>
+              <div className="row__actions">
+                <button className="icon-btn" onClick={() => openEdit(s)} aria-label="Изменить">✏️</button>
+                <button className="icon-btn" onClick={() => remove(s.id)} aria-label="Удалить">🗑</button>
+              </div>
             </div>
           </div>
         </div>
       ))}
 
       {open && (
-        <Modal title="Новая запись ТО" onClose={() => setOpen(false)}>
+        <Modal title={editing ? "Изменить запись ТО" : "Новая запись ТО"} onClose={() => setOpen(false)}>
           <form onSubmit={submit}>
             <div className="form-row">
               <div className="field">

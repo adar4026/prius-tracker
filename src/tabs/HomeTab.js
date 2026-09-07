@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 import Stat from "../components/Stat";
+import CarModal from "../components/CarModal";
 import { CAR, OIL_INTERVAL_KM } from "../data";
 import {
-  avg, byDateDesc, consumptionPoints, fmtDate, fmtKm, fmtMoney, fmtNum, num,
+  avg, byDateDesc, consumptionPoints, effectivePriority, fmtDate, fmtKm,
+  fmtMoney, fmtNum, num,
 } from "../utils";
 
 function lastOilChange(service) {
@@ -12,13 +14,12 @@ function lastOilChange(service) {
 }
 
 export default function HomeTab({ fuel, service, reminders, currentKm, onGo }) {
-  const [specsOpen, setSpecsOpen] = useState(false);
+  const [carOpen, setCarOpen] = useState(false);
 
   const points = consumptionPoints(fuel);
   const avgConsumption = avg(points.map((p) => p.consumption));
-  const totalLiters = fuel.reduce((s, f) => s + num(f.liters), 0);
-  const totalFuelCost = fuel.reduce((s, f) => s + num(f.total), 0);
-  const avgPrice = totalLiters ? totalFuelCost / totalLiters : null;
+  const totalPaid = fuel.reduce((s, f) => s + num(f.paidTotal), 0);
+  const avgPrice = avg(fuel.map((f) => num(f.pricePerL)).filter((p) => p > 0));
   const totalService = service.reduce((s, r) => s + num(r.cost), 0);
 
   const oil = lastOilChange(service);
@@ -28,7 +29,7 @@ export default function HomeTab({ fuel, service, reminders, currentKm, onGo }) {
   const oilColor = left <= 0 ? "var(--red)" : left < 1500 ? "var(--gold)" : "var(--green)";
 
   const tasks = reminders
-    .filter((r) => r.priority === "overdue" || r.priority === "upcoming" || (r.dueKm && currentKm >= r.dueKm))
+    .filter((r) => ["overdue", "upcoming"].includes(effectivePriority(r, currentKm)))
     .slice(0, 4);
 
   const recent = [...fuel].sort(byDateDesc).slice(0, 3);
@@ -47,9 +48,9 @@ export default function HomeTab({ fuel, service, reminders, currentKm, onGo }) {
       </div>
 
       <div className="grid-2" style={{ marginTop: 10 }}>
-        <Stat icon="⛽" label="Средний расход" value={fmtNum(avgConsumption, 2)} unit="л/100" color="var(--green)" />
+        <Stat icon="⛽" label="Средний расход" value={fmtNum(avgConsumption, 2)} unit="л/100 км" color="var(--green)" />
         <Stat icon="💶" label="Средняя цена" value={fmtNum(avgPrice, 3)} unit="€/л" color="var(--blue)" />
-        <Stat icon="🛢" label="Топливо всего" value={fmtMoney(totalFuelCost, 0)} />
+        <Stat icon="🛢" label="Топливо всего" value={fmtMoney(totalPaid, 0)} />
         <Stat icon="🔧" label="ТО всего" value={fmtMoney(totalService, 0)} />
       </div>
 
@@ -81,7 +82,7 @@ export default function HomeTab({ fuel, service, reminders, currentKm, onGo }) {
         <>
           <div className="section-title">Ближайшие задачи</div>
           {tasks.map((t) => {
-            const isOverdue = t.priority === "overdue" || (t.dueKm && currentKm >= t.dueKm);
+            const isOverdue = effectivePriority(t, currentKm) === "overdue";
             return (
               <div
                 key={t.id}
@@ -121,9 +122,9 @@ export default function HomeTab({ fuel, service, reminders, currentKm, onGo }) {
                   </div>
                 </div>
                 <div className="row__right">
-                  <div className="row__value">{fmtMoney(f.total)}</div>
+                  <div className="row__value">{fmtMoney(f.paidTotal)}</div>
                   <div className="row__sub" style={{ color: "var(--green)" }}>
-                    {f.consumption ? `${fmtNum(f.consumption, 1)} л/100` : "—"}
+                    {f.consumption ? `${fmtNum(f.consumption, 2)} л/100 км` : "—"}
                   </div>
                 </div>
               </div>
@@ -133,25 +134,16 @@ export default function HomeTab({ fuel, service, reminders, currentKm, onGo }) {
       )}
 
       <div className="section-title">Автомобиль</div>
-      <div className="card">
-        <div className="row" onClick={() => setSpecsOpen((v) => !v)} style={{ cursor: "pointer" }}>
-          <div className="row__main">
-            <div className="row__title">🚗 {CAR.model}</div>
-            <div className="row__sub">{CAR.year} • {CAR.engine}</div>
-          </div>
-          <span className="icon-btn">{specsOpen ? "▲" : "▼"}</span>
-        </div>
-        {specsOpen && (
-          <dl style={{ margin: "12px 0 0" }}>
-            <div className="spec"><dt>VIN</dt><dd>{CAR.vin}</dd></div>
-            <div className="spec"><dt>Цвет</dt><dd>{CAR.color}</dd></div>
-            <div className="spec"><dt>Масло</dt><dd>{CAR.oil}</dd></div>
-            <div className="spec"><dt>АКПП</dt><dd>{CAR.gearbox}</dd></div>
-            <div className="spec"><dt>Антифриз</dt><dd>{CAR.coolant}</dd></div>
-            <div className="spec"><dt>Шины</dt><dd>{CAR.tires}</dd></div>
-          </dl>
-        )}
-      </div>
+      <button type="button" className="card car-card" onClick={() => setCarOpen(true)}>
+        <span className="car-card__icon">🚗</span>
+        <span className="car-card__main">
+          <span className="row__title">{CAR.model}</span>
+          <span className="row__sub">{CAR.year}</span>
+        </span>
+        <span className="car-card__chevron">›</span>
+      </button>
+
+      {carOpen && <CarModal onClose={() => setCarOpen(false)} />}
     </main>
   );
 }

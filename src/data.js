@@ -1,25 +1,32 @@
 // Начальные данные. Используются только при первом запуске —
 // дальше всё живёт в localStorage.
+//
+// Модель заправки:
+//   grossTotal — стоимость топлива до скидки
+//   discount   — скидка (0, если её нет)
+//   paidTotal  — реально оплаченная сумма (grossTotal - discount)
+//   fullTank   — заправка до полного бака
+// Литры никогда не корректируются из-за скидки.
 
 export const INITIAL_FUEL = [
-  { id:1,  date:"2026-03-11", km:209834, liters:32.652, pricePerL:1.825, total:59.59,  station:"Хихон", consumption:5.5 },
-  { id:2,  date:"2026-03-20", km:210554, liters:36.502, pricePerL:1.924, total:70.23,  station:"", consumption:5.4 },
-  { id:3,  date:"2026-03-28", km:211058, liters:25.073, pricePerL:1.579, total:39.59,  station:"", consumption:5.6 },
-  { id:4,  date:"2026-04-06", km:211627, liters:13.080, pricePerL:1.529, total:20.00,  station:"Лангрео", consumption:4.9 },
-  { id:5,  date:"2026-04-17", km:212135, liters:38.40,  pricePerL:1.647, total:60.74,  station:"La Ferrera-Siero", consumption:4.9 },
-  { id:6,  date:"2026-04-25", km:212993, liters:38.14,  pricePerL:1.645, total:58.90,  station:"Хихон", consumption:4.7 },
-  { id:7,  date:"2026-05-02", km:213747, liters:35.87,  pricePerL:1.669, total:59.87,  station:"Хихон", consumption:4.7 },
-  { id:8,  date:"2026-05-14", km:214503, liters:37.06,  pricePerL:1.619, total:57.00,  station:"La Corredoria-Oviedo", consumption:4.89 },
-  { id:9,  date:"2026-05-23", km:215239, liters:33.742, pricePerL:1.419, total:47.88,  station:"Alcampo Nalón, El Entrego", consumption:4.58 },
-  { id:10, date:"2026-06-11", km:216020, liters:36.61,  pricePerL:1.585, total:55.00,  station:"La Corredoria-Oviedo (Repsol)", consumption:4.69 },
-  { id:11, date:"2026-06-24", km:216701, liters:32.701, pricePerL:1.529, total:50.00,  station:"Овьедо", consumption:4.7 },
-  { id:12, date:"2026-07-04", km:217151, liters:25.49,  pricePerL:1.685, total:41.31,  station:"La Ferrera-Siero (Repsol)", consumption:null },
-  { id:13, date:"2026-07-17", km:217701, liters:27.20,  pricePerL:1.765, total:46.74,  station:"La Ferrera-Siero (Repsol)", consumption:4.95 },
-  { id:14, date:"2026-08-01", km:218464, liters:37.978, pricePerL:1.820, total:69.12,  station:"Viella-Siero (Repsol)", consumption:5.0 },
-  { id:15, date:"2026-08-16", km:219225, liters:26.752, pricePerL:1.869, total:50.00,  station:"Petroprin Овьедо", consumption:4.7, note:"Не до полного" },
-  { id:16, date:"2026-08-26", km:219763, liters:34.332, pricePerL:1.819, total:62.45,  station:"Viella-Siero (Repsol)", consumption:4.8 },
-  { id:17, date:"2026-09-04", km:220446, liters:25.316, pricePerL:1.975, total:50.00,  station:"CAMPSA Vega de Valdetronco", consumption:4.5 },
-  { id:18, date:"2026-09-06", km:220684, liters:20.949, pricePerL:1.959, total:41.04,  station:"Repsol San Agustín de Guadalix", consumption:4.8 },
+  { id:1,  date:"2026-03-11", km:209834, liters:32.652, pricePerL:1.825, grossTotal:59.59, discount:0,    paidTotal:59.59, station:"Хихон", fullTank:true, note:"", consumption:5.5 },
+  { id:2,  date:"2026-03-20", km:210554, liters:36.502, pricePerL:1.924, grossTotal:70.23, discount:0,    paidTotal:70.23, station:"", fullTank:true, note:"", consumption:5.4 },
+  { id:3,  date:"2026-03-28", km:211058, liters:25.073, pricePerL:1.579, grossTotal:39.59, discount:0,    paidTotal:39.59, station:"", fullTank:true, note:"", consumption:5.6 },
+  { id:4,  date:"2026-04-06", km:211627, liters:13.080, pricePerL:1.529, grossTotal:20.00, discount:0,    paidTotal:20.00, station:"Лангрео", fullTank:true, note:"", consumption:4.9 },
+  { id:5,  date:"2026-04-17", km:212135, liters:38.40,  pricePerL:1.647, grossTotal:60.74, discount:0,    paidTotal:60.74, station:"La Ferrera-Siero", fullTank:true, note:"", consumption:4.9 },
+  { id:6,  date:"2026-04-25", km:212993, liters:38.14,  pricePerL:1.645, grossTotal:58.90, discount:0,    paidTotal:58.90, station:"Хихон", fullTank:true, note:"", consumption:4.7 },
+  { id:7,  date:"2026-05-02", km:213747, liters:35.87,  pricePerL:1.669, grossTotal:59.87, discount:0,    paidTotal:59.87, station:"Хихон", fullTank:true, note:"", consumption:4.7 },
+  { id:8,  date:"2026-05-14", km:214503, liters:37.06,  pricePerL:1.619, grossTotal:57.00, discount:0,    paidTotal:57.00, station:"La Corredoria-Oviedo", fullTank:true, note:"", consumption:4.89 },
+  { id:9,  date:"2026-05-23", km:215239, liters:33.742, pricePerL:1.419, grossTotal:47.88, discount:0,    paidTotal:47.88, station:"Alcampo Nalón, El Entrego", fullTank:true, note:"", consumption:4.58 },
+  { id:10, date:"2026-06-11", km:216020, liters:36.61,  pricePerL:1.585, grossTotal:55.00, discount:0,    paidTotal:55.00, station:"La Corredoria-Oviedo (Repsol)", fullTank:true, note:"", consumption:4.69 },
+  { id:11, date:"2026-06-24", km:216701, liters:32.701, pricePerL:1.529, grossTotal:50.00, discount:0,    paidTotal:50.00, station:"Овьедо", fullTank:true, note:"", consumption:4.7 },
+  { id:12, date:"2026-07-04", km:217151, liters:25.49,  pricePerL:1.685, grossTotal:41.31, discount:0,    paidTotal:41.31, station:"La Ferrera-Siero (Repsol)", fullTank:true, note:"", consumption:null },
+  { id:13, date:"2026-07-17", km:217701, liters:27.20,  pricePerL:1.765, grossTotal:46.74, discount:0,    paidTotal:46.74, station:"La Ferrera-Siero (Repsol)", fullTank:true, note:"", consumption:4.95 },
+  { id:14, date:"2026-08-01", km:218464, liters:37.978, pricePerL:1.820, grossTotal:69.12, discount:0,    paidTotal:69.12, station:"Viella-Siero (Repsol)", fullTank:true, note:"", consumption:5.0 },
+  { id:15, date:"2026-08-16", km:219225, liters:26.752, pricePerL:1.869, grossTotal:50.00, discount:0,    paidTotal:50.00, station:"Petroprin Овьедо", fullTank:false, note:"", consumption:null },
+  { id:16, date:"2026-08-26", km:219763, liters:36.42,  pricePerL:1.819, grossTotal:66.25, discount:3.80, paidTotal:62.45, station:"Repsol/CAMPSA CRED SIERO, Viella", fullTank:true, note:"", consumption:4.8 },
+  { id:17, date:"2026-09-04", km:220446, liters:25.316, pricePerL:1.975, grossTotal:50.00, discount:0,    paidTotal:50.00, station:"CAMPSA Vega de Valdetronco", fullTank:true, note:"", consumption:4.5 },
+  { id:18, date:"2026-09-06", km:220684, liters:20.949, pricePerL:1.959, grossTotal:41.04, discount:2.54, paidTotal:38.50, station:"Repsol San Agustín de Guadalix", fullTank:true, note:"", consumption:4.8 },
 ];
 
 export const INITIAL_SERVICE = [
@@ -54,13 +61,13 @@ export const INITIAL_SERVICE = [
 ];
 
 export const INITIAL_REMINDERS = [
-  { id:1, title:"Моторное масло 0W-20", icon:"🔧", dueKm:221000, dueDate:"2026-09-15", priority:"overdue", note:"ПРОСРОЧЕНО! Сейчас 220.684 км" },
-  { id:2, title:"Тормозная жидкость DOT4", icon:"💧", dueKm:233000, dueDate:"2026-09-04", priority:"upcoming", note:"Через ~12.000 км" },
-  { id:3, title:"Суппорт тормозной", icon:"🛑", dueKm:null, dueDate:null, priority:"pending", note:"Куплен (56€), не установлен" },
-  { id:4, title:"Задние амортизаторы KYB", icon:"🚗", dueKm:null, dueDate:null, priority:"pending", note:"Куплены (66,43€), не установлены" },
-  { id:5, title:"Антифриз (след. замена)", icon:"❄️", dueKm:316000, dueDate:"2030-06-01", priority:"info", note:"Заменён 11.06.26. След. ~316.000 км / 2030" },
-  { id:6, title:"ITV Техосмотр", icon:"📋", dueKm:null, dueDate:"2027-01-29", priority:"info", note:"Прошёл 24.01.25 на 176.540 км" },
-  { id:7, title:"Страховка Zurich", icon:"🛡️", dueKm:null, dueDate:"2026-11-21", priority:"info", note:"Продлена 21.11.24 (271€)" },
+  { id:1, title:"Моторное масло 0W-20", icon:"🔧", dueKm:221000, dueDate:"2026-09-15", priority:"overdue", note:"ПРОСРОЧЕНО! Сейчас 220.684 км", completed:false, completedDate:null, completedKm:null },
+  { id:2, title:"Тормозная жидкость DOT4", icon:"💧", dueKm:233000, dueDate:"2026-09-04", priority:"upcoming", note:"Через ~12.000 км", completed:false, completedDate:null, completedKm:null },
+  { id:3, title:"Суппорт тормозной", icon:"🛑", dueKm:null, dueDate:null, priority:"pending", note:"Куплен (56€), не установлен", completed:false, completedDate:null, completedKm:null },
+  { id:4, title:"Задние амортизаторы KYB", icon:"🚗", dueKm:null, dueDate:null, priority:"pending", note:"Куплены (66,43€), не установлены", completed:false, completedDate:null, completedKm:null },
+  { id:5, title:"Антифриз (след. замена)", icon:"❄️", dueKm:316000, dueDate:"2030-06-01", priority:"info", note:"Заменён 11.06.26. След. ~316.000 км / 2030", completed:false, completedDate:null, completedKm:null },
+  { id:6, title:"ITV Техосмотр", icon:"📋", dueKm:null, dueDate:"2027-01-29", priority:"info", note:"Прошёл 24.01.25 на 176.540 км", completed:false, completedDate:null, completedKm:null },
+  { id:7, title:"Страховка Zurich", icon:"🛡️", dueKm:null, dueDate:"2026-11-21", priority:"info", note:"Продлена 21.11.24 (271€)", completed:false, completedDate:null, completedKm:null },
 ];
 
 export const CATEGORY_COLORS = {
@@ -75,16 +82,36 @@ export const CATEGORY_LABELS = {
   suspension:"Подвеска", body:"Кузов"
 };
 
+export const REMINDER_ICONS = ["🔧","💧","🛑","🚗","❄️","📋","🛡️","⚙️","🔋","🛞","🪫","📌"];
+
 export const CAR = {
   model: "Toyota Prius+ 1.8 HSD",
   year: "2012",
-  engine: "2ZR-FXE Hybrid, 136 CV",
+  engine: "2ZR-FXE Hybrid 136 CV",
   vin: "JTDZS3EU003044352",
   color: "1G3",
-  oil: "0W-20 Toyota Optimal Fuel Economy, 4.2 л",
-  gearbox: "ATF WS, 3.4 л",
-  coolant: "Toyota SLLC розовый, 9.3 л (7.2 л + 2.1 л)",
-  tires: "215/50 R17",
+  specs: [
+    {
+      title: "Моторное масло",
+      rows: [["Тип", "Toyota 0W-20"], ["Объём с фильтром", "4.2 л"]],
+    },
+    {
+      title: "Трансмиссия",
+      rows: [["Тип", "Toyota ATF WS"], ["Объём", "3.4 л"]],
+    },
+    {
+      title: "Антифриз",
+      rows: [
+        ["Тип", "Toyota Super Long Life Coolant (SLLC), розовый"],
+        ["Двигатель", "примерно 7.2 л"],
+        ["Инвертор", "примерно 2.1 л"],
+      ],
+    },
+    {
+      title: "Шины",
+      rows: [["Размер", "215/50 R17"]],
+    },
+  ],
 };
 
 // Интервал замены моторного масла, км
