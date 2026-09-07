@@ -227,6 +227,14 @@ button, input, select, textarea {
 .row__title { font-weight: 600; font-size: 14px; }
 .row__sub { font-size: 12px; color: var(--muted); margin-top: 3px; }
 .row__right { text-align: right; flex: none; }
+/* сколько прошло с момента записи — считается на лету, не хранится */
+.row__elapsed {
+  font-size: 11px;
+  color: var(--red);
+  margin-top: 4px;
+  line-height: 1.35;
+  overflow-wrap: break-word;
+}
 .row__value { font-weight: 700; font-variant-numeric: tabular-nums; }
 .row__value--small { font-size: 13px; }
 

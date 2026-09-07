@@ -390,3 +390,57 @@ export const serviceSearchText = (s, categoryLabel = "") =>
     s.category, categoryLabel,
     numTokens(s.cost, 2), "€ стоимость",
   ].join(" ");
+
+/* ---------------- сколько прошло с записи ---------------- */
+
+/**
+ * Календарная разница от даты записи до сегодня: годы, месяцы, дни.
+ * Считается по календарю, поэтому «1 мес.» — это то же число следующего
+ * месяца, а не 30 суток. Дата в будущем разницы не даёт (null).
+ */
+export function elapsedSince(iso, fromISO = todayISO()) {
+  if (!iso || iso > fromISO) return null;
+  const [y1, m1, d1] = iso.split("-").map(Number);
+  const [y2, m2, d2] = fromISO.split("-").map(Number);
+  if (!y1 || !m1 || !d1 || !y2 || !m2 || !d2) return null;
+
+  let years = y2 - y1;
+  let months = m2 - m1;
+  let days = d2 - d1;
+  if (days < 0) {
+    months -= 1;
+    // занимаем дни у предыдущего месяца — у него своя длина
+    days += new Date(Date.UTC(y2, m2 - 1, 0)).getUTCDate();
+  }
+  if (months < 0) { years -= 1; months += 12; }
+  return { years, months, days };
+}
+
+/**
+ * «3 мес. 26 дн.», «1 г. 2 мес.», «4 дн.».
+ * Показываются только две старшие единицы: после года дни уже не важны.
+ */
+export function fmtElapsed(e) {
+  if (!e) return "";
+  if (e.years > 0) return e.months > 0 ? `${e.years} г. ${e.months} мес.` : `${e.years} г.`;
+  if (e.months > 0) return e.days > 0 ? `${e.months} мес. ${e.days} дн.` : `${e.months} мес.`;
+  return `${e.days} дн.`;
+}
+
+/**
+ * Возраст записи: время от её даты до сегодня и пробег от её показаний до
+ * текущего. Обе части необязательны — показывается то, что известно;
+ * ничего не известно — null. Ничего не хранится: и дни, и километры
+ * пересчитываются на каждый рендер от актуального пробега и текущей даты.
+ */
+export function elapsedLabel(entry, currentKm) {
+  if (!entry) return null;
+  const time = fmtElapsed(elapsedSince(entry.date));
+  const km =
+    Number.isFinite(entry.km) && entry.km > 0 &&
+    Number.isFinite(currentKm) && currentKm >= entry.km
+      ? `${fmtKm(currentKm - entry.km)} км`
+      : "";
+  const parts = [time, km].filter(Boolean);
+  return parts.length ? parts.join(" • ") : null;
+}

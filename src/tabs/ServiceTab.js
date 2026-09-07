@@ -5,8 +5,8 @@ import JournalFilter from "../components/JournalFilter";
 import NextServiceFields from "../components/NextServiceFields";
 import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS } from "../data";
 import {
-  addMonths, byDateDesc, entryYear, fmtDate, fmtKm, fmtMoney, matchesQuery,
-  nextId, num, numOrNull, serviceSearchText, todayISO, yearsOf,
+  addMonths, byDateDesc, elapsedLabel, entryYear, fmtDate, fmtKm, fmtMoney,
+  matchesQuery, nextId, num, numOrNull, serviceSearchText, todayISO, yearsOf,
 } from "../utils";
 
 const CATS = Object.keys(CATEGORY_LABELS);
@@ -349,6 +349,10 @@ export default function ServiceTab({
                     {linked.dueDate ? fmtDate(linked.dueDate) : ""}
                   </div>
                 );
+              })()}
+              {(() => {
+                const elapsed = elapsedLabel(s, currentKm);
+                return elapsed && <div className="row__elapsed">🔴 Прошло: {elapsed}</div>;
               })()}
             </div>
             <div className="row__right">
