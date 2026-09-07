@@ -2,7 +2,7 @@
   "name": "autocontrol",
   "version": "1.0.0",
   "private": true,
-  "homepage": "https://USERNAME.github.io/prius-tracker",
+  "homepage": "https://adar4026.github.io/prius-tracker",
   "dependencies": {
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
