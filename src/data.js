@@ -62,7 +62,7 @@ export const INITIAL_SERVICE = [
 
 export const INITIAL_REMINDERS = [
   { id:1, title:"Моторное масло 0W-20", icon:"🔧", dueKm:221000, dueDate:"2026-09-15", priority:"upcoming", note:"Замена моторного масла 0W-20", completed:false, completedDate:null, completedKm:null },
-  { id:2, title:"Тормозная жидкость DOT4", icon:"💧", dueKm:233000, dueDate:null, priority:"upcoming", note:"Через ~12.000 км", completed:false, completedDate:null, completedKm:null },
+  { id:2, title:"Тормозная жидкость DOT4", icon:"💧", dueKm:233000, dueDate:"2027-08-08", priority:"upcoming", note:"Заменена 08.08.2025 на 192 820 км", completed:false, completedDate:null, completedKm:null },
   { id:3, title:"Суппорт тормозной", icon:"🛑", dueKm:null, dueDate:null, priority:"pending", note:"Куплен (56€), не установлен", completed:false, completedDate:null, completedKm:null },
   { id:4, title:"Задние амортизаторы KYB", icon:"🚗", dueKm:null, dueDate:null, priority:"pending", note:"Куплены (66,43€), не установлены", completed:false, completedDate:null, completedKm:null },
   { id:5, title:"Антифриз (след. замена)", icon:"❄️", dueKm:316000, dueDate:"2030-06-01", priority:"info", note:"Заменён 11.06.26. След. ~316.000 км / 2030", completed:false, completedDate:null, completedKm:null },
