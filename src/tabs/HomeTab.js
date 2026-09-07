@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import Stat from "../components/Stat";
 import CarModal from "../components/CarModal";
-import { CAR, OIL_INTERVAL_KM } from "../data";
+import { CAR } from "../data";
 import {
   avg, byDateDesc, consumptionPoints, effectivePriority, fmtDate, fmtKm,
-  fmtMoney, fmtNum, num,
+  fmtMoney, fmtNum, kmLeftLabel, num,
 } from "../utils";
 
 function lastOilChange(service) {
@@ -23,10 +23,15 @@ export default function HomeTab({ fuel, service, reminders, currentKm, onGo }) {
   const totalService = service.reduce((s, r) => s + num(r.cost), 0);
 
   const oil = lastOilChange(service);
+  // прогресс ведём от того же dueKm, что и в задаче "Моторное масло 0W-20" —
+  // без собственного фиксированного интервала
+  const oilReminder = reminders.find((r) => r.title === "Моторное масло 0W-20");
+  const dueKm = oilReminder?.dueKm ?? null;
   const driven = oil ? currentKm - oil.km : 0;
-  const left = OIL_INTERVAL_KM - driven;
-  const pct = Math.min(100, Math.round((driven / OIL_INTERVAL_KM) * 100));
-  const oilColor = left <= 0 ? "var(--red)" : left < 1500 ? "var(--gold)" : "var(--green)";
+  const totalSpan = oil && dueKm !== null ? dueKm - oil.km : null;
+  const pct = totalSpan ? Math.min(100, Math.max(0, Math.round((driven / totalSpan) * 100))) : 0;
+  const oilLeft = dueKm !== null ? kmLeftLabel({ dueKm, completed: false }, currentKm) : null;
+  const oilColor = !oilLeft ? "var(--muted)" : oilLeft.overdue ? "var(--red)" : dueKm - currentKm < 1500 ? "var(--gold)" : "var(--green)";
 
   const tasks = reminders
     .filter((r) => ["overdue", "upcoming"].includes(effectivePriority(r, currentKm)))
@@ -67,12 +72,14 @@ export default function HomeTab({ fuel, service, reminders, currentKm, onGo }) {
             </div>
             <div className="progress__meta">
               <span>Заменено на {fmtKm(oil.km)} км</span>
-              <span style={{ color: oilColor }}>
-                {left > 0 ? `осталось ${fmtKm(left)} км` : `просрочено на ${fmtKm(-left)} км`}
-              </span>
+              {oilLeft && (
+                <span style={{ color: oilColor }}>{oilLeft.text}</span>
+              )}
             </div>
             <div className="hint">
-              Пройдено {fmtKm(driven)} км из {fmtKm(OIL_INTERVAL_KM)} • {fmtDate(oil.date)}
+              {totalSpan !== null
+                ? <>Пройдено {fmtKm(driven)} км из {fmtKm(totalSpan)} • {fmtDate(oil.date)}</>
+                : <>Пройдено {fmtKm(driven)} км • {fmtDate(oil.date)}</>}
             </div>
           </div>
         </>
