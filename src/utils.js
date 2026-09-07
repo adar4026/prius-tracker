@@ -306,18 +306,12 @@ export function nearestDueLabel(r, currentKm) {
     if (kmLeft === 0) return { text: "пробег достигнут", overdue: true };
     return { text: `просрочено на ${fmtKm(-kmLeft)} км`, overdue: true };
   }
-  if (dLeft > 0) return { text: `через ${dLeft} ${plural(dLeft, "день", "дня", "дней")}`, overdue: false };
-  if (dLeft === 0) return { text: "срок сегодня", overdue: true };
-  return { text: `просрочено на ${-dLeft} ${plural(-dLeft, "день", "дня", "дней")}`, overdue: true };
-}
-
-function plural(n, one, few, many) {
-  const a = Math.abs(n) % 100;
-  const b = a % 10;
-  if (a > 10 && a < 20) return many;
-  if (b > 1 && b < 5) return few;
-  if (b === 1) return one;
-  return many;
+  if (dLeft === 0) return { text: "сегодня", overdue: true };
+  const span = calendarUntil(r.dueDate);
+  const formatted = fmtElapsed(span);
+  return span.overdue
+    ? { text: `просрочено на ${formatted}`, overdue: true }
+    : { text: `через ${formatted}`, overdue: false };
 }
 
 /** Динамический текст остатка до срока: dueKm - currentKm */
@@ -394,14 +388,13 @@ export const serviceSearchText = (s, categoryLabel = "") =>
 /* ---------------- сколько прошло с записи ---------------- */
 
 /**
- * Календарная разница от даты записи до сегодня: годы, месяцы, дни.
- * Считается по календарю, поэтому «1 мес.» — это то же число следующего
- * месяца, а не 30 суток. Дата в будущем разницы не даёт (null).
+ * Календарная разница между двумя датами (earlierISO ожидается не позже
+ * laterISO): годы, месяцы, дни. Считается по календарю, поэтому «1 мес.» —
+ * это то же число следующего месяца, а не 30 суток.
  */
-export function elapsedSince(iso, fromISO = todayISO()) {
-  if (!iso || iso > fromISO) return null;
-  const [y1, m1, d1] = iso.split("-").map(Number);
-  const [y2, m2, d2] = fromISO.split("-").map(Number);
+function calendarSpan(earlierISO, laterISO) {
+  const [y1, m1, d1] = earlierISO.split("-").map(Number);
+  const [y2, m2, d2] = laterISO.split("-").map(Number);
   if (!y1 || !m1 || !d1 || !y2 || !m2 || !d2) return null;
 
   let years = y2 - y1;
@@ -414,6 +407,28 @@ export function elapsedSince(iso, fromISO = todayISO()) {
   }
   if (months < 0) { years -= 1; months += 12; }
   return { years, months, days };
+}
+
+/**
+ * Календарная разница от даты записи до сегодня. Дата в будущем разницы
+ * не даёт (null) — для этого случая см. calendarUntil.
+ */
+export function elapsedSince(iso, fromISO = todayISO()) {
+  if (!iso || iso > fromISO) return null;
+  return calendarSpan(iso, fromISO);
+}
+
+/**
+ * Календарный остаток до даты в обе стороны: {years, months, days, overdue}.
+ * Дата в будущем — сколько до неё осталось; дата в прошлом — на сколько
+ * она просрочена. Совпадение с сегодня даёт нули — вызывающий код сам
+ * решает, показывать ли отдельным текстом «сегодня».
+ */
+export function calendarUntil(iso, fromISO = todayISO()) {
+  if (!iso) return null;
+  const overdue = iso < fromISO;
+  const span = overdue ? calendarSpan(iso, fromISO) : calendarSpan(fromISO, iso);
+  return span ? { ...span, overdue } : null;
 }
 
 /**
