@@ -73,13 +73,15 @@ export const INITIAL_REMINDERS = [
 export const CATEGORY_COLORS = {
   oil:"#d4af37", fluid:"#4caf8a", brakes:"#e07b54",
   tires:"#7b9fd4", inspection:"#aaa", battery:"#c084fc",
-  suspension:"#fb923c", body:"#94a3b8"
+  suspension:"#fb923c", body:"#94a3b8",
+  parts:"#e6b8a2", insurance:"#8ecae6", other:"#9c9c9c"
 };
 
 export const CATEGORY_LABELS = {
   oil:"Масло", fluid:"Жидкости", brakes:"Тормоза",
   tires:"Шины", inspection:"Осмотр", battery:"Аккумулятор",
-  suspension:"Подвеска", body:"Кузов"
+  suspension:"Подвеска", body:"Кузов",
+  parts:"Запчасти", insurance:"Страховка", other:"Прочее"
 };
 
 export const REMINDER_ICONS = ["🔧","💧","🛑","🚗","❄️","📋","🛡️","⚙️","🔋","🛞","🪫","📌"];

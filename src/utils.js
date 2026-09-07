@@ -5,6 +5,17 @@ export const num = (v) => {
   return Number.isFinite(n) ? n : 0;
 };
 
+/**
+ * Как num, но неизвестное значение остаётся null, а не превращается в 0.
+ * Нужно для исторических записей, где часть данных не восстановлена:
+ * «неизвестно» и «ноль» — разные вещи и в журнале, и в статистике.
+ */
+export const numOrNull = (v) => {
+  if (v === null || v === undefined || v === "") return null;
+  const n = parseFloat(String(v).replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+};
+
 const round = (v, digits) => {
   const k = 10 ** digits;
   return Math.round(v * k) / k;
@@ -23,9 +34,11 @@ export const isPartial = (e) => !isFull(e);
 // 220 684 км — неразрывный пробел как разделитель тысяч
 export const fmtKm = (v) => Math.round(v || 0).toLocaleString("ru-RU");
 
-// 38,50 €
+// 38,50 € — неизвестная сумма показывается как «—», ноль остаётся нулём
 export const fmtMoney = (v, digits = 2) =>
-  `${(v || 0).toFixed(digits).replace(".", ",")} €`;
+  v === null || v === undefined || !Number.isFinite(v)
+    ? "—"
+    : `${v.toFixed(digits).replace(".", ",")} €`;
 
 // 20,95 / 1,959 / 4,82
 export const fmtNum = (v, digits = 2) =>
@@ -62,19 +75,23 @@ export const nextId = (list) =>
  * Старая запись с одним total: grossTotal = paidTotal = total, discount = 0.
  */
 export function migrateFuelEntry(e) {
-  const liters = num(e.liters);
-  const pricePerL = num(e.pricePerL);
+  // null сохраняется как null: часть исторических записей неполная
+  const liters = numOrNull(e.liters);
+  const pricePerL = numOrNull(e.pricePerL);
 
   const grossTotal =
-    e.grossTotal !== undefined && e.grossTotal !== null ? num(e.grossTotal)
-    : e.total !== undefined && e.total !== null ? num(e.total)
-    : round(liters * pricePerL, 2);
+    e.grossTotal !== undefined && e.grossTotal !== null ? numOrNull(e.grossTotal)
+    : e.total !== undefined && e.total !== null ? numOrNull(e.total)
+    : liters !== null && pricePerL !== null ? round(liters * pricePerL, 2)
+    : null;
 
   const discount = num(e.discount);
   const paidTotal =
     e.paidTotal !== undefined && e.paidTotal !== null
-      ? num(e.paidTotal)
-      : round(grossTotal - discount, 2);
+      ? numOrNull(e.paidTotal)
+      : grossTotal !== null
+        ? round(grossTotal - discount, 2)
+        : null;
 
   // раньше признак неполного бака жил в note
   const legacyPartial =
@@ -105,8 +122,9 @@ export const migrateFuel = (list) =>
 export const migrateService = (list) =>
   (Array.isArray(list) ? list : []).map((s) => ({
     ...s,
-    km: Math.round(num(s.km)),
-    cost: num(s.cost),
+    // km и cost могут быть неизвестны — тогда null, а не 0
+    km: s.km === null || s.km === undefined ? null : Math.round(num(s.km)),
+    cost: s.cost === undefined ? 0 : numOrNull(s.cost),
     note: s.note || "",
   }));
 
@@ -152,25 +170,29 @@ export function calcConsumption(existing, entry) {
  * Записи до fromKm сохраняют исторические значения, но участвуют
  * в определении базы цикла.
  */
-export function recalcFrom(list, fromKm = -Infinity) {
+export function recalcFrom(list, fromKm = -Infinity, toKm = Infinity) {
   const sorted = [...list].sort(byKmAsc);
-  let baseKm = null;   // пробег последнего полного бака
-  let pending = 0;     // литры неполных заправок после него
+  let baseKm = null;         // пробег последнего полного бака
+  let pending = 0;           // литры неполных заправок после него
+  let pendingUnknown = false; // среди них есть заправка с неизвестным объёмом
 
   return sorted.map((e) => {
     const full = isFull(e);
+    const liters = numOrNull(e.liters);
     let consumption = Number.isFinite(e.consumption) ? e.consumption : null;
 
-    if (e.km >= fromKm) {
-      if (!full || baseKm === null || e.km <= baseKm) {
+    if (e.km >= fromKm && e.km <= toKm) {
+      // цикл с неизвестным объёмом расход не даёт — лучше «—», чем неверная цифра
+      if (!full || baseKm === null || e.km <= baseKm || liters === null || pendingUnknown) {
         consumption = null;
       } else {
-        consumption = round(((pending + num(e.liters)) / (e.km - baseKm)) * 100, 2);
+        consumption = round(((pending + liters) / (e.km - baseKm)) * 100, 2);
       }
     }
 
-    if (full) { baseKm = e.km; pending = 0; }
-    else { pending += num(e.liters); }
+    if (full) { baseKm = e.km; pending = 0; pendingUnknown = false; }
+    else if (liters === null) { pendingUnknown = true; }
+    else { pending += liters; }
 
     return { ...e, consumption };
   });
@@ -218,3 +240,65 @@ export const kmLeftLabel = (r, currentKm) => {
   if (left === 0) return { text: "Срок наступил", overdue: true };
   return { text: `Просрочено на ${fmtKm(-left)} км`, overdue: true };
 };
+
+/* ---------------- журнал: год и поиск ---------------- */
+
+/** Год записи как строка: "2026". */
+export const entryYear = (e) => (e && e.date ? e.date.slice(0, 4) : "");
+
+/** Все годы, встречающиеся в переданных списках, от новых к старым. */
+export const yearsOf = (...lists) => {
+  const set = new Set();
+  lists.flat().forEach((e) => {
+    const y = entryYear(e);
+    if (y) set.add(y);
+  });
+  return [...set].sort((a, b) => b.localeCompare(a));
+};
+
+// toLocaleString вставляет неразрывные пробелы — для поиска они обычные
+const normalize = (v) =>
+  String(v === null || v === undefined ? "" : v)
+    .toLowerCase()
+    .replace(/[  ]/g, " ");
+
+/** Число в поиске должно находиться и как «25823», и как «25 823» / «25,82». */
+const numTokens = (v, digits) =>
+  v === null || v === undefined || !Number.isFinite(v) ? "" : `${v} ${fmtNum(v, digits)}`;
+
+/**
+ * Все токены запроса должны присутствовать в строке записи (И, а не ИЛИ),
+ * поэтому «2025 масло» сужает выдачу, как и ожидается.
+ */
+export function matchesQuery(haystack, query) {
+  const q = normalize(query).trim();
+  if (!q) return true;
+  const hay = normalize(haystack);
+  return q.split(/\s+/).every((token) => hay.includes(token));
+}
+
+/** Строка, по которой ищется заправка. */
+export const fuelSearchText = (f) =>
+  [
+    "заправка топливо бензин азс",
+    f.date, fmtDate(f.date), entryYear(f),
+    f.km, fmtKm(f.km),
+    numTokens(f.liters, 2), "л литры",
+    numTokens(f.pricePerL, 3), "€/л цена",
+    numTokens(f.grossTotal, 2), numTokens(f.paidTotal, 2), "€ сумма",
+    f.discount ? `скидка ${numTokens(f.discount, 2)}` : "",
+    f.station, f.note,
+    isFull(f) ? "полный бак" : "не до полного частичная",
+    f.consumption ? `расход ${numTokens(f.consumption, 2)}` : "",
+  ].join(" ");
+
+/** Строка, по которой ищется запись ТО / расхода. Ярлык категории передаёт вызывающий. */
+export const serviceSearchText = (s, categoryLabel = "") =>
+  [
+    "то сервис ремонт обслуживание расход",
+    s.date, fmtDate(s.date), entryYear(s),
+    s.km ? `${s.km} ${fmtKm(s.km)}` : "",
+    s.type, s.note,
+    s.category, categoryLabel,
+    numTokens(s.cost, 2), "€ стоимость",
+  ].join(" ");

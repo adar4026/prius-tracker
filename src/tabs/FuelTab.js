@@ -1,9 +1,12 @@
 import React, { useMemo, useState } from "react";
 import Modal from "../components/Modal";
 import DateField from "../components/DateField";
+import JournalFilter from "../components/JournalFilter";
+import Stat from "../components/Stat";
 import {
-  byDateDesc, byKmAsc, calcConsumption, fmtDate, fmtKm, fmtMoney, fmtNum,
-  isFull, nextId, num, recalcFrom, todayISO,
+  avg, byDateDesc, byKmAsc, calcConsumption, entryYear, fmtDate, fmtKm, fmtMoney,
+  fmtNum, fuelSearchText, isFull, matchesQuery, nextId, num, numOrNull,
+  recalcFrom, todayISO, yearsOf,
 } from "../utils";
 
 const emptyForm = () => ({
@@ -19,20 +22,27 @@ const emptyForm = () => ({
   note: "",
 });
 
+// неизвестное значение исторической записи открывается пустым полем, а не «null»
+const numField = (v, digits) =>
+  v === null || v === undefined || !Number.isFinite(v)
+    ? ""
+    : digits === undefined ? String(v) : v.toFixed(digits);
+
 const toForm = (e) => ({
   date: e.date,
-  km: String(e.km),
-  liters: String(e.liters),
-  pricePerL: String(e.pricePerL),
-  grossTotal: e.grossTotal.toFixed(2),
+  km: numField(e.km),
+  liters: numField(e.liters),
+  pricePerL: numField(e.pricePerL),
+  grossTotal: numField(e.grossTotal, 2),
   discount: e.discount ? e.discount.toFixed(2) : "",
-  paidTotal: e.paidTotal.toFixed(2),
+  paidTotal: numField(e.paidTotal, 2),
   station: e.station || "",
   fullTank: isFull(e),
   note: e.note || "",
 });
 
-export default function FuelTab({ fuel, setFuel }) {
+export default function FuelTab({ fuel, setFuel, year, onYear }) {
+  const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null); // редактируемая запись или null
   const [form, setForm] = useState(emptyForm());
@@ -43,6 +53,38 @@ export default function FuelTab({ fuel, setFuel }) {
     () => (fuel.length ? [...fuel].sort(byKmAsc)[fuel.length - 1].km : 0),
     [fuel]
   );
+
+  const years = useMemo(() => yearsOf(fuel), [fuel]);
+  const counts = useMemo(() => {
+    const map = {};
+    fuel.forEach((f) => { map[entryYear(f)] = (map[entryYear(f)] || 0) + 1; });
+    return map;
+  }, [fuel]);
+  // выбранный в другом разделе год мог не встретиться в заправках
+  const activeYear = years.includes(year) ? year : "all";
+
+  const visible = useMemo(
+    () =>
+      sorted.filter(
+        (f) =>
+          (activeYear === "all" || entryYear(f) === activeYear) &&
+          matchesQuery(fuelSearchText(f), query)
+      ),
+    [sorted, activeYear, query]
+  );
+  const filtered = activeYear !== "all" || query.trim() !== "";
+
+  // статистика следует за выбранным периодом и поиском
+  const stats = useMemo(() => {
+    const liters = visible.reduce((s, f) => s + num(f.liters), 0);
+    const paid = visible.reduce((s, f) => s + num(f.paidTotal), 0);
+    const discount = visible.reduce((s, f) => s + num(f.discount), 0);
+    const prices = visible.map((f) => numOrNull(f.pricePerL)).filter((p) => p !== null && p > 0);
+    const cons = visible
+      .filter((f) => isFull(f) && Number.isFinite(f.consumption) && f.consumption > 0)
+      .map((f) => f.consumption);
+    return { liters, paid, discount, avgPrice: avg(prices), avgCons: avg(cons) };
+  }, [visible]);
 
   const openAdd = () => {
     setEditing(null);
@@ -100,17 +142,22 @@ export default function FuelTab({ fuel, setFuel }) {
   const submit = (e) => {
     e.preventDefault();
     const km = Math.round(num(form.km));
-    const liters = num(form.liters);
-    const pricePerL = num(form.pricePerL);
-    const grossTotal = num(form.grossTotal) || +(liters * pricePerL).toFixed(2);
+    const liters = numOrNull(form.liters);
+    const pricePerL = numOrNull(form.pricePerL);
+    const grossTotal =
+      numOrNull(form.grossTotal) ??
+      (liters !== null && pricePerL !== null ? +(liters * pricePerL).toFixed(2) : null);
     const discount = num(form.discount);
-    const paidTotal = form.paidTotal !== "" ? num(form.paidTotal) : +(grossTotal - discount).toFixed(2);
+    const paidTotal =
+      form.paidTotal !== ""
+        ? numOrNull(form.paidTotal)
+        : grossTotal !== null ? +(grossTotal - discount).toFixed(2) : null;
 
     if (!form.date) return setError("Укажите дату");
     if (!km) return setError("Укажите пробег");
-    if (!liters) return setError("Укажите количество литров");
     if (discount < 0) return setError("Скидка не может быть отрицательной");
-    if (discount > grossTotal) return setError("Скидка больше суммы до скидки");
+    if (grossTotal !== null && discount > grossTotal)
+      return setError("Скидка больше суммы до скидки");
     if (fuel.some((f) => f.km === km && f.id !== editing?.id))
       return setError("Заправка с таким пробегом уже есть");
 
@@ -119,7 +166,10 @@ export default function FuelTab({ fuel, setFuel }) {
       date: form.date,
       km,
       liters,
-      pricePerL: pricePerL || (liters ? +(grossTotal / liters).toFixed(3) : 0),
+      pricePerL:
+        pricePerL !== null
+          ? pricePerL
+          : liters && grossTotal !== null ? +(grossTotal / liters).toFixed(3) : null,
       grossTotal,
       discount,
       paidTotal,
@@ -145,11 +195,42 @@ export default function FuelTab({ fuel, setFuel }) {
     <main className="screen">
       <button className="btn" onClick={openAdd}>+ Добавить заправку</button>
 
-      <div className="section-title">Все заправки · {fuel.length}</div>
+      <JournalFilter
+        years={years}
+        counts={counts}
+        total={fuel.length}
+        year={activeYear}
+        onYear={onYear}
+        query={query}
+        onQuery={setQuery}
+        placeholder="Поиск: АЗС, пробег, дата, сумма…"
+      />
 
-      {!sorted.length && <div className="empty">Пока нет ни одной заправки</div>}
+      {visible.length > 0 && (
+        <div className="grid-2">
+          <Stat icon="⛽" label="Средний расход" value={fmtNum(stats.avgCons, 2)} unit="л/100 км" color="var(--green)" />
+          <Stat icon="💶" label="Средняя цена" value={fmtNum(stats.avgPrice, 3)} unit="€/л" color="var(--blue)" />
+          <Stat icon="🛢" label="Литров" value={fmtNum(stats.liters, 2)} unit="л" />
+          <Stat icon="💰" label="Оплачено" value={fmtMoney(stats.paid, 0)} />
+        </div>
+      )}
+      {stats.discount > 0 && (
+        <div className="hint" style={{ padding: "6px 2px 0", color: "var(--green)" }}>
+          Скидок за период: {fmtMoney(stats.discount)}
+        </div>
+      )}
 
-      {sorted.map((f) => (
+      <div className="section-title">
+        {filtered ? `Показано · ${visible.length}` : `Все заправки · ${fuel.length}`}
+      </div>
+
+      {!visible.length && (
+        <div className="empty">
+          {fuel.length ? "Ничего не найдено" : "Пока нет ни одной заправки"}
+        </div>
+      )}
+
+      {visible.map((f) => (
         <div key={f.id} className="item">
           <div className="row">
             <div className="row__main">
@@ -283,6 +364,7 @@ export default function FuelTab({ fuel, setFuel }) {
               {!form.fullTank
                 ? "Расход не считается — литры перейдут в следующую полную заправку."
                 : `Расчётный расход: ${preview ? `${fmtNum(preview, 2)} л/100 км` : "—"}`}
+              {form.liters === "" && " Литры можно оставить пустыми, если они неизвестны."}
             </div>
 
             {error && <div className="hint" style={{ color: "var(--red)" }}>{error}</div>}

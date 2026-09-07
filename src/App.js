@@ -9,6 +9,7 @@ import ServiceTab from "./tabs/ServiceTab";
 import RemindersTab from "./tabs/RemindersTab";
 import { KEYS, usePersistentState } from "./storage";
 import { INITIAL_FUEL, INITIAL_SERVICE, INITIAL_REMINDERS } from "./data";
+import { HISTORY_IMPORTS, applyFuelBatch, applyServiceBatch } from "./history";
 import { THEMES, THEME_META } from "./themes";
 import {
   effectivePriority, fmtKm, migrateFuel, migrateReminders, migrateService,
@@ -22,14 +23,36 @@ const TABS = [
   { id: "reminders", icon: "🔔", label: "Задачи",   title: "Задачи" },
 ];
 
+const CURRENT_YEAR = String(new Date().getFullYear());
+
 export default function App() {
   const [tab, setTab] = useState("home");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // выбранный год общий для журналов, поэтому не сбрасывается при смене вкладки
+  const [year, setYear] = useState(CURRENT_YEAR);
 
   const [theme, setTheme] = usePersistentState(KEYS.theme, "dark");
   const [fuel, setFuel] = usePersistentState(KEYS.fuel, INITIAL_FUEL, migrateFuel);
   const [service, setService] = usePersistentState(KEYS.service, INITIAL_SERVICE, migrateService);
   const [reminders, setReminders] = usePersistentState(KEYS.reminders, INITIAL_REMINDERS, migrateReminders);
+  const [importsDone, setImportsDone] = usePersistentState(KEYS.imports, []);
+
+  // Разовая доливка исторических записей: на устройстве, где localStorage уже
+  // заполнен, INITIAL_* не применяются, поэтому история приходит миграцией.
+  useEffect(() => {
+    const pending = HISTORY_IMPORTS.filter(
+      (batch) => !(Array.isArray(importsDone) ? importsDone : []).includes(batch.id)
+    );
+    if (!pending.length) return;
+
+    setFuel((prev) => pending.reduce(applyFuelBatch, prev));
+    setService((prev) => pending.reduce(applyServiceBatch, prev));
+    setImportsDone((prev) =>
+      [...new Set([...(Array.isArray(prev) ? prev : []), ...pending.map((b) => b.id)])]
+    );
+    // применяется один раз за сессию, дальше защищает список выполненных импортов
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const safeTheme = THEMES.includes(theme) ? theme : "dark";
 
@@ -84,9 +107,13 @@ export default function App() {
           onGo={setTab}
         />
       )}
-      {tab === "fuel" && <FuelTab fuel={fuel} setFuel={setFuel} />}
+      {tab === "fuel" && (
+        <FuelTab fuel={fuel} setFuel={setFuel} year={year} onYear={setYear} />
+      )}
       {tab === "charts" && <ChartsTab fuel={fuel} theme={safeTheme} />}
-      {tab === "service" && <ServiceTab service={service} setService={setService} />}
+      {tab === "service" && (
+        <ServiceTab service={service} setService={setService} year={year} onYear={setYear} />
+      )}
       {tab === "reminders" && (
         <RemindersTab
           reminders={reminders}

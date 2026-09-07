@@ -5,6 +5,7 @@ export const KEYS = {
   service: "autocontrol_service",
   reminders: "autocontrol_reminders",
   theme: "autocontrol_theme",
+  imports: "autocontrol_imports",
 };
 
 function read(key, fallback) {

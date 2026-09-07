@@ -284,6 +284,52 @@ button, input, select, textarea {
   font-weight: 600;
 }
 
+/* ---------- поиск по журналу ---------- */
+
+.search {
+  position: relative;
+  margin-top: 14px;
+}
+.search input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 10px 34px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.search input:focus { border-color: var(--gold); }
+.search input::-webkit-search-cancel-button,
+.search input::-webkit-search-decoration { -webkit-appearance: none; display: none; }
+.search__icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13px;
+  opacity: 0.6;
+  pointer-events: none;
+}
+.search__clear {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
 .seg {
   display: flex;
   gap: 4px;

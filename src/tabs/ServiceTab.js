@@ -1,8 +1,12 @@
 import React, { useMemo, useState } from "react";
 import Modal from "../components/Modal";
 import DateField from "../components/DateField";
+import JournalFilter from "../components/JournalFilter";
 import { CATEGORY_COLORS, CATEGORY_LABELS } from "../data";
-import { byDateDesc, fmtDate, fmtKm, fmtMoney, nextId, num } from "../utils";
+import {
+  byDateDesc, entryYear, fmtDate, fmtKm, fmtMoney, matchesQuery, nextId, num,
+  numOrNull, serviceSearchText, yearsOf,
+} from "../utils";
 
 const CATS = Object.keys(CATEGORY_LABELS);
 const today = () => new Date().toISOString().slice(0, 10);
@@ -11,21 +15,43 @@ const emptyForm = () => ({
   date: today(), km: "", type: "", cost: "", note: "", category: "oil",
 });
 
-export default function ServiceTab({ service, setService }) {
+export default function ServiceTab({ service, setService, year, onYear }) {
   const [filter, setFilter] = useState("all");
+  const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null); // редактируемая запись или null
   const [form, setForm] = useState(emptyForm());
   const [error, setError] = useState("");
 
   const sorted = useMemo(() => [...service].sort(byDateDesc), [service]);
+
+  const years = useMemo(() => yearsOf(service), [service]);
+  const counts = useMemo(() => {
+    const map = {};
+    service.forEach((s) => { map[entryYear(s)] = (map[entryYear(s)] || 0) + 1; });
+    return map;
+  }, [service]);
+  // выбранный в другом разделе год мог не встретиться в записях ТО
+  const activeYear = years.includes(year) ? year : "all";
+
+  // год и поиск сужают выборку до применения фильтра категорий
+  const inPeriod = useMemo(
+    () =>
+      sorted.filter(
+        (s) =>
+          (activeYear === "all" || entryYear(s) === activeYear) &&
+          matchesQuery(serviceSearchText(s, CATEGORY_LABELS[s.category]), query)
+      ),
+    [sorted, activeYear, query]
+  );
   const visible = useMemo(
-    () => (filter === "all" ? sorted : sorted.filter((s) => s.category === filter)),
-    [sorted, filter]
+    () => (filter === "all" ? inPeriod : inPeriod.filter((s) => s.category === filter)),
+    [inPeriod, filter]
   );
 
   const spent = visible.reduce((s, r) => s + num(r.cost), 0);
-  const free = visible.filter((r) => !num(r.cost)).length;
+  const free = visible.filter((r) => numOrNull(r.cost) === 0).length;
+  const unknown = visible.filter((r) => numOrNull(r.cost) === null).length;
 
   const setField = (name, value) => setForm((f) => ({ ...f, [name]: value }));
 
@@ -42,7 +68,7 @@ export default function ServiceTab({ service, setService }) {
       date: item.date,
       km: item.km ? String(item.km) : "",
       type: item.type,
-      cost: item.cost ? String(item.cost) : "",
+      cost: item.cost === null || item.cost === undefined ? "" : String(item.cost),
       note: item.note || "",
       category: item.category,
     });
@@ -58,9 +84,9 @@ export default function ServiceTab({ service, setService }) {
     const entry = {
       id: editing ? editing.id : nextId(service),
       date: form.date,
-      km: Math.round(num(form.km)),
+      km: form.km === "" ? null : Math.round(num(form.km)),
       type: form.type.trim(),
-      cost: num(form.cost),
+      cost: numOrNull(form.cost),
       note: form.note.trim(),
       category: form.category,
     };
@@ -84,15 +110,26 @@ export default function ServiceTab({ service, setService }) {
     <main className="screen">
       <button className="btn" onClick={openAdd}>+ Добавить запись</button>
 
-      <div className="chip-row" style={{ marginTop: 14 }}>
+      <JournalFilter
+        years={years}
+        counts={counts}
+        total={service.length}
+        year={activeYear}
+        onYear={onYear}
+        query={query}
+        onQuery={setQuery}
+        placeholder="Поиск: работа, мастер, пробег, дата…"
+      />
+
+      <div className="chip-row">
         <button
           className={`chip ${filter === "all" ? "chip--active" : ""}`}
           onClick={() => setFilter("all")}
         >
-          Все · {service.length}
+          Все · {inPeriod.length}
         </button>
         {CATS.map((cat) => {
-          const n = service.filter((s) => s.category === cat).length;
+          const n = inPeriod.filter((s) => s.category === cat).length;
           if (!n) return null;
           return (
             <button
@@ -119,13 +156,18 @@ export default function ServiceTab({ service, setService }) {
       </div>
       <div className="hint" style={{ padding: "6px 2px 0" }}>
         Бесплатно / по гарантии: {free}
+        {unknown > 0 && ` • стоимость неизвестна: ${unknown}`}
       </div>
 
       <div className="section-title">
-        {filter === "all" ? "Все работы" : CATEGORY_LABELS[filter]}
+        {filter === "all" ? "Все работы" : CATEGORY_LABELS[filter]} · {visible.length}
       </div>
 
-      {!visible.length && <div className="empty">Записей нет</div>}
+      {!visible.length && (
+        <div className="empty">
+          {service.length ? "Ничего не найдено" : "Записей нет"}
+        </div>
+      )}
 
       {visible.map((s) => (
         <div key={s.id} className="item item--striped">
@@ -143,8 +185,16 @@ export default function ServiceTab({ service, setService }) {
               {s.note && <div className="row__sub">{s.note}</div>}
             </div>
             <div className="row__right">
-              <div className="row__value" style={{ color: num(s.cost) ? "var(--text)" : "var(--green)" }}>
-                {num(s.cost) ? fmtMoney(s.cost, 2) : "0 €"}
+              <div
+                className="row__value"
+                style={{
+                  color:
+                    s.cost === null ? "var(--muted)"
+                    : num(s.cost) ? "var(--text)"
+                    : "var(--green)",
+                }}
+              >
+                {s.cost === null ? "—" : num(s.cost) ? fmtMoney(s.cost, 2) : "0 €"}
               </div>
               <div className="row__actions">
                 <button className="icon-btn" onClick={() => openEdit(s)} aria-label="Изменить">✏️</button>
@@ -184,7 +234,7 @@ export default function ServiceTab({ service, setService }) {
               <div className="field">
                 <label>Стоимость, €</label>
                 <input
-                  type="number" step="0.01" inputMode="decimal" placeholder="0"
+                  type="number" step="0.01" inputMode="decimal" placeholder="неизвестно"
                   value={form.cost} onChange={(e) => setField("cost", e.target.value)}
                 />
               </div>

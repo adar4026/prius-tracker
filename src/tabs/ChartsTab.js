@@ -6,6 +6,7 @@ import {
 import { chartColors } from "../themes";
 import {
   avg, byKmAsc, consumptionPoints, fmtMoney, fmtNum, isFull, monthLabel, num,
+  numOrNull,
 } from "../utils";
 
 const MODES = [
@@ -42,10 +43,12 @@ export default function ChartsTab({ fuel, theme }) {
     [consumption]
   );
 
+  // заправки с неизвестной ценой на график не попадают — иначе это ноль в ряду
   const prices = useMemo(
     () =>
       [...fuel]
         .sort(byKmAsc)
+        .filter((f) => numOrNull(f.pricePerL) !== null)
         .map((f) => ({ label: shortDate(f.date), price: num(f.pricePerL) })),
     [fuel]
   );
