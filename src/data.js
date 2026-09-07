@@ -113,6 +113,3 @@ export const CAR = {
     },
   ],
 };
-
-// Интервал замены моторного масла, км
-export const OIL_INTERVAL_KM = 10000;
