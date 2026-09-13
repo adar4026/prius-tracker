@@ -211,17 +211,17 @@ export default function FuelTab({ fuel, setFuel, year, onYear }) {
         placeholder="Поиск: АЗС, пробег, дата, сумма…"
       />
 
+      {/* литры и оплаченная сумма считаются в stats, но на экран не выводятся —
+          на телефоне они только загромождают сводку */}
       {visible.length > 0 && (
         <div className="grid-2">
           <Stat icon="⛽" label="Средний расход" value={fmtNum(stats.avgCons, 2)} unit="л/100 км" color="var(--green)" />
           <Stat icon="💶" label="Средняя цена" value={fmtNum(stats.avgPrice, 3)} unit="€/л" color="var(--blue)" />
-          <Stat icon="🛢" label="Литров" value={fmtNum(stats.liters, 2)} unit="л" />
-          <Stat icon="💰" label="Оплачено" value={fmtMoney(stats.paid, 0)} />
         </div>
       )}
       {stats.discount > 0 && (
-        <div className="hint" style={{ padding: "6px 2px 0", color: "var(--green)" }}>
-          Скидок за период: {fmtMoney(stats.discount)}
+        <div className="summary-line" style={{ color: "var(--green)" }}>
+          Скидка за период: {fmtMoney(stats.discount)}
         </div>
       )}
 

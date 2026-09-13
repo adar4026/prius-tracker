@@ -369,6 +369,119 @@ button, input, select, textarea {
   cursor: pointer;
 }
 
+/* ---------- компактные фильтры журнала («Период», «Категория») ---------- */
+
+/* кнопки стоят в ряд и переносятся на узком экране, не сжимаясь и не обрезаясь */
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 0 8px;
+}
+.filter-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.2;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+}
+.filter-btn:active { opacity: 0.75; }
+.filter-btn__key { color: var(--muted); }
+.filter-btn__val {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.filter-btn__caret { color: var(--muted); font-size: 11px; margin-left: 1px; }
+/* активный (не «Все») фильтр подсвечен акцентом, чтобы было видно сужение списка */
+.filter-btn--active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.filter-btn--active .filter-btn__val,
+.filter-btn--active .filter-btn__caret { color: var(--accent); }
+html[data-theme="light"] .filter-btn {
+  background: #ffffff;
+  border-color: #d4e2e8;
+  box-shadow: 0 2px 8px rgba(32, 74, 91, 0.08);
+}
+html[data-theme="light"] .filter-btn--active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+/* нижнее меню выбора варианта фильтра */
+.sheet {
+  width: 100%;
+  max-width: 480px;
+  max-height: 70vh;
+  overflow-y: auto;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 18px 18px 0 0;
+  padding: 8px 10px calc(14px + env(safe-area-inset-bottom, 0px));
+  animation: slide-up 0.22s ease;
+}
+.sheet__handle {
+  width: 36px;
+  height: 4px;
+  margin: 2px auto 10px;
+  border-radius: 999px;
+  background: var(--border);
+}
+.sheet__title {
+  padding: 0 10px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.sheet__option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 13px 12px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text);
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+.sheet__option + .sheet__option { margin-top: 2px; }
+.sheet__option:active { background: var(--soft); }
+.sheet__option--active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+.sheet__dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.sheet__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sheet__count { color: var(--muted); font-variant-numeric: tabular-nums; font-weight: 500; }
+.sheet__check { margin-left: auto; width: 18px; text-align: right; font-weight: 700; }
+
+/* короткая строка под сводкой вместо отдельной карточки */
+.summary-line { font-size: 12px; font-weight: 600; padding: 8px 2px 0; }
+
 .seg {
   display: flex;
   gap: 4px;
@@ -786,6 +899,12 @@ html[data-theme="light"] .item--card {
 }
 /* на главной все карточки (пробег, статистика, масло, автомобиль) тоже белые */
 html[data-theme="light"] .screen--home .card {
+  background: #ffffff;
+  border-color: #d4e2e8;
+  box-shadow: 0 4px 14px rgba(32, 74, 91, 0.10);
+}
+/* сводочные карточки журналов и графиков — в том же белом стиле */
+html[data-theme="light"] .stat {
   background: #ffffff;
   border-color: #d4e2e8;
   box-shadow: 0 4px 14px rgba(32, 74, 91, 0.10);

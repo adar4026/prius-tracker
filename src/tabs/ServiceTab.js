@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import Modal from "../components/Modal";
 import DateField from "../components/DateField";
 import JournalFilter from "../components/JournalFilter";
+import FilterMenu from "../components/FilterMenu";
 import NextServiceFields from "../components/NextServiceFields";
 import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS } from "../data";
 import {
@@ -61,6 +62,22 @@ export default function ServiceTab({
     () => (filter === "all" ? inPeriod : inPeriod.filter((s) => s.category === filter)),
     [inPeriod, filter]
   );
+
+  // категории берутся из самих записей (в порядке справочника, неизвестные — в конец),
+  // счётчик показывает, сколько таких работ попало в выбранный период
+  const categoryOptions = useMemo(() => {
+    const present = new Set(service.map((s) => s.category));
+    const ordered = [...CATS.filter((c) => present.has(c)), ...[...present].filter((c) => !CATS.includes(c))];
+    return [
+      { id: "all", label: "Все категории", shortLabel: "Все", count: inPeriod.length },
+      ...ordered.map((cat) => ({
+        id: cat,
+        label: CATEGORY_LABELS[cat] || cat,
+        color: CATEGORY_COLORS[cat],
+        count: inPeriod.filter((s) => s.category === cat).length,
+      })),
+    ];
+  }, [service, inPeriod]);
 
   const spent = visible.reduce((s, r) => s + num(r.cost), 0);
   const free = visible.filter((r) => numOrNull(r.cost) === 0).length;
@@ -275,30 +292,15 @@ export default function ServiceTab({
         query={query}
         onQuery={setQuery}
         placeholder="Поиск: работа, мастер, пробег, дата…"
-      />
-
-      <div className="chip-row">
-        <button
-          className={`chip ${filter === "all" ? "chip--active" : ""}`}
-          onClick={() => setFilter("all")}
-        >
-          Все · {inPeriod.length}
-        </button>
-        {CATS.map((cat) => {
-          const n = inPeriod.filter((s) => s.category === cat).length;
-          if (!n) return null;
-          return (
-            <button
-              key={cat}
-              className={`chip ${filter === cat ? "chip--active" : ""}`}
-              onClick={() => setFilter(cat)}
-              style={filter === cat ? { background: CATEGORY_COLORS[cat], borderColor: CATEGORY_COLORS[cat] } : undefined}
-            >
-              {CATEGORY_LABELS[cat]} · {n}
-            </button>
-          );
-        })}
-      </div>
+      >
+        <FilterMenu
+          name="Категория"
+          title="Категория"
+          value={filter}
+          options={categoryOptions}
+          onChange={setFilter}
+        />
+      </JournalFilter>
 
       <div className="grid-2">
         <div className="card stat">
@@ -316,7 +318,7 @@ export default function ServiceTab({
       </div>
 
       <div className="section-title">
-        {filter === "all" ? "Все работы" : CATEGORY_LABELS[filter]} · {visible.length}
+        {filter === "all" ? "Все работы" : CATEGORY_LABELS[filter] || filter} · {visible.length}
       </div>
 
       {!visible.length && (

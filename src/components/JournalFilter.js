@@ -1,12 +1,20 @@
 import React from "react";
+import FilterMenu from "./FilterMenu";
 
 /**
- * Поиск + переключение года для журналов.
+ * Поиск + компактные фильтры журнала.
  * Годы приходят из самих записей, поэтому новый год появляется сам.
+ * Дополнительные фильтры (например, категория ТО) передаются детьми —
+ * они встают в одну строку с «Периодом» и переносятся на узком экране.
  */
 export default function JournalFilter({
-  years, counts, total, year, onYear, query, onQuery, placeholder,
+  years, counts, total, year, onYear, query, onQuery, placeholder, children,
 }) {
+  const options = [
+    { id: "all", label: "Все записи", shortLabel: "Все", count: total },
+    ...years.map((y) => ({ id: y, label: y, count: counts[y] || 0 })),
+  ];
+
   return (
     <>
       <div className="search">
@@ -33,24 +41,9 @@ export default function JournalFilter({
         )}
       </div>
 
-      <div className="chip-row">
-        <button
-          type="button"
-          className={`chip ${year === "all" ? "chip--active" : ""}`}
-          onClick={() => onYear("all")}
-        >
-          Все · {total}
-        </button>
-        {years.map((y) => (
-          <button
-            type="button"
-            key={y}
-            className={`chip ${year === y ? "chip--active" : ""}`}
-            onClick={() => onYear(y)}
-          >
-            {y} · {counts[y] || 0}
-          </button>
-        ))}
+      <div className="filter-row">
+        <FilterMenu name="Период" title="Период" value={year} options={options} onChange={onYear} />
+        {children}
       </div>
     </>
   );
