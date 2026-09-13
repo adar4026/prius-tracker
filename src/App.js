@@ -17,7 +17,7 @@ import {
 } from "./utils";
 
 const TABS = [
-  { id: "home",      icon: "🏠", label: "Главная", title: "Autocontrol" },
+  { id: "home",      icon: "🏠", label: "Главная", title: "Lexcar" },
   { id: "fuel",      icon: "⛽", label: "Топливо",  title: "Топливо" },
   { id: "charts",    icon: "📊", label: "Графики",  title: "Графики" },
   { id: "service",   icon: "🔧", label: "ТО",       title: "История ТО" },

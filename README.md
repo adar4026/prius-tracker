@@ -1,4 +1,4 @@
-# 🚗 Autocontrol
+# 🚗 Lexcar
 
 Учёт заправок, расхода топлива и обслуживания Toyota Prius+ 1.8 HSD (2012).
 React + recharts, все данные хранятся в `localStorage` браузера — сервер не нужен.

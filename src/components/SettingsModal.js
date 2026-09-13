@@ -7,7 +7,7 @@ const EXPORT_VERSION = 1;
 /** Проверка структуры импортируемого файла. Бросает понятную ошибку. */
 function validateBackup(raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
-    throw new Error("Файл не похож на резервную копию Autocontrol");
+    throw new Error("Файл не похож на резервную копию Lexcar");
   }
   const keys = ["fuel", "service", "reminders"];
   const present = keys.filter((k) => raw[k] !== undefined);
@@ -52,7 +52,7 @@ export default function SettingsModal({ fuel, service, reminders, theme, onImpor
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `autocontrol-${todayISO()}.json`;
+      a.download = `lexcar-${todayISO()}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
