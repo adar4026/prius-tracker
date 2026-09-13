@@ -22,7 +22,7 @@ import {
 } from "./utils";
 
 const TABS = [
-  { id: "home",      icon: "🏠", label: "Главная" },
+  { id: "home",      icon: "🏠", label: "Главное", menuLabel: "Главная" },
   { id: "fuel",      icon: "⛽", label: "Топливо" },
   { id: "charts",    icon: "📊", label: "Графики" },
   { id: "service",   icon: "🔧", label: "ТО", menuLabel: "Техническое обслуживание" },

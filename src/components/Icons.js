@@ -69,3 +69,41 @@ export const CarIcon = (p) => (
     <path d="M2 12h20M5 16h2M17 16h2" />
   </Svg>
 );
+
+/* ---- иконки нижней навигации (контуры в стиле lucide) ---- */
+
+export const HomeIcon = (p) => (
+  <Svg {...p}>
+    <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" />
+    <path d="M3 10a2 2 0 0 1 .7-1.5l7-6a2 2 0 0 1 2.6 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+  </Svg>
+);
+
+export const FuelIcon = (p) => (
+  <Svg {...p}>
+    <path d="M3 22h12M4 9h10" />
+    <path d="M14 22V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v18" />
+    <path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 4 0V9.8a2 2 0 0 0-.6-1.4L18 5" />
+  </Svg>
+);
+
+export const ChartIcon = (p) => (
+  <Svg {...p}>
+    <path d="M4 18v3M8 14v7M12 16v5M16 14v7M20 10v11" />
+    <path d="m22 3-8.6 8.6a.5.5 0 0 1-.8 0L9.4 8.4a.5.5 0 0 0-.8 0L2 15" />
+  </Svg>
+);
+
+export const WrenchIcon = (p) => (
+  <Svg {...p}>
+    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-8 8l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 8-8l-3.8 3.8Z" />
+  </Svg>
+);
+
+export const ClipboardCheckIcon = (p) => (
+  <Svg {...p}>
+    <rect width="8" height="4" x="8" y="2" rx="1" />
+    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+    <path d="m9 14 2 2 4-4" />
+  </Svg>
+);
