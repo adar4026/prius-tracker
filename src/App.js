@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Header from "./components/Header";
 import BottomNav from "./components/BottomNav";
 import SideDrawer from "./components/SideDrawer";
+import GlobalSearch from "./components/GlobalSearch";
 import HomeTab from "./tabs/HomeTab";
 import FuelTab from "./tabs/FuelTab";
 import ChartsTab from "./tabs/ChartsTab";
@@ -15,6 +16,7 @@ import { HISTORY_IMPORTS, applyFuelBatch, applyServiceBatch } from "./history";
 import { THEMES, THEME_META } from "./themes";
 import { CATEGORY_ICONS } from "./data";
 import { VEHICLE_DEFAULTS, migrateVehicle } from "./vehicle";
+import { useVehiclePhoto } from "./photo";
 import {
   entryYear, migrateFuel, migrateReminders, migrateService, reminderStatus,
 } from "./utils";
@@ -44,6 +46,11 @@ export default function App() {
   // Вкладка при этом не меняется, поэтому «Назад» возвращает туда, откуда пришли.
   const [page, setPage] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  // запись, к которой нужно прокрутить вкладку после перехода из поиска: { id }
+  const [focus, setFocus] = useState(null);
+  // секция страницы «Автомобиль», которую нужно раскрыть при открытии
+  const [vehicleSection, setVehicleSection] = useState(null);
   // выбранный год общий для журналов, поэтому не сбрасывается при смене вкладки
   const [year, setYear] = useState(CURRENT_YEAR);
   // заготовка формы ТО для сценария «Выполнить» из раздела «Задачи»
@@ -55,6 +62,9 @@ export default function App() {
   const [reminders, setReminders] = usePersistentState(KEYS.reminders, INITIAL_REMINDERS, migrateReminders);
   const [vehicle, setVehicle] = usePersistentState(KEYS.vehicle, VEHICLE_DEFAULTS, migrateVehicle);
   const [importsDone, setImportsDone] = usePersistentState(KEYS.imports, []);
+  // фото живёт в IndexedDB и в резервную копию не входит
+  const photo = useVehiclePhoto();
+  const { remove: removePhoto } = photo;
 
   // Разовая доливка исторических записей: на устройстве, где localStorage уже
   // заполнен, INITIAL_* не применяются, поэтому история приходит миграцией.
@@ -100,7 +110,12 @@ export default function App() {
   }, []);
 
   const openPage = useCallback((id) => setPage(id), []);
-  const closePage = useCallback(() => setPage(null), []);
+  const closePage = useCallback(() => {
+    setPage(null);
+    setVehicleSection(null);
+  }, []);
+  const focused = useCallback(() => setFocus(null), []);
+  const closeSearch = useCallback(() => setSearchOpen(false), []);
 
   // внутренняя страница открывается с начала. Эффект родителя срабатывает
   // после очистки эффектов шторки, которая возвращает прокрутку фона.
@@ -110,6 +125,25 @@ export default function App() {
 
   const drawerSelect = useCallback(
     (id) => (id === "vehicle" || id === "settings" ? openPage(id) : goTab(id)),
+    [openPage, goTab]
+  );
+
+  /**
+   * Переход из глобального поиска: журналы получают год записи и id для
+   * прокрутки, задачи — id, характеристика автомобиля — нужную секцию.
+   */
+  const openSearchResult = useCallback(
+    (target) => {
+      setSearchOpen(false);
+      if (target.type === "vehicle") {
+        setVehicleSection(target.section);
+        openPage("vehicle");
+        return;
+      }
+      if (target.date) setYear(target.date.slice(0, 4));
+      setFocus({ id: target.id });
+      goTab(target.type === "reminder" ? "reminders" : target.type);
+    },
     [openPage, goTab]
   );
 
@@ -163,7 +197,8 @@ export default function App() {
     setService([]);
     setReminders([]);
     setVehicle(migrateVehicle({}));
-  }, [setFuel, setService, setReminders, setVehicle]);
+    removePhoto().catch(() => {});
+  }, [setFuel, setService, setReminders, setVehicle, removePhoto]);
 
   const drawerActive = page || tab;
 
@@ -173,9 +208,11 @@ export default function App() {
         <VehiclePage
           vehicle={vehicle}
           setVehicle={setVehicle}
+          photo={photo}
           service={service}
           reminders={reminders}
           currentKm={currentKm}
+          initialSection={vehicleSection}
           onBack={closePage}
           onOpenService={openService}
           onOpenReminders={() => goTab("reminders")}
@@ -198,7 +235,11 @@ export default function App() {
 
       {!page && (
         <>
-          <Header title="Lexcar" onMenu={() => setDrawerOpen(true)} />
+          <Header
+            title="Lexcar"
+            onMenu={() => setDrawerOpen(true)}
+            onSearch={() => setSearchOpen(true)}
+          />
 
           {tab === "home" && (
             <HomeTab
@@ -207,12 +248,20 @@ export default function App() {
               reminders={reminders}
               currentKm={currentKm}
               vehicle={vehicle}
+              photoUrl={photo.url}
               onGo={goTab}
               onOpenVehicle={() => openPage("vehicle")}
             />
           )}
           {tab === "fuel" && (
-            <FuelTab fuel={fuel} setFuel={setFuel} year={year} onYear={setYear} />
+            <FuelTab
+              fuel={fuel}
+              setFuel={setFuel}
+              year={year}
+              onYear={setYear}
+              focus={focus}
+              onFocused={focused}
+            />
           )}
           {tab === "charts" && <ChartsTab fuel={fuel} service={service} theme={safeTheme} />}
           {tab === "service" && (
@@ -226,6 +275,8 @@ export default function App() {
               onYear={setYear}
               draft={serviceDraft}
               onDraftUsed={() => setServiceDraft(null)}
+              focus={focus}
+              onFocused={focused}
             />
           )}
           {tab === "reminders" && (
@@ -235,6 +286,8 @@ export default function App() {
               service={service}
               currentKm={currentKm}
               onComplete={completeReminder}
+              focus={focus}
+              onFocused={focused}
             />
           )}
         </>
@@ -254,9 +307,22 @@ export default function App() {
         active={drawerActive}
         onSelect={drawerSelect}
         vehicle={vehicle}
+        photoUrl={photo.url}
         currentKm={currentKm}
         version={APP_VERSION}
       />
+
+      {searchOpen && (
+        <GlobalSearch
+          fuel={fuel}
+          service={service}
+          reminders={reminders}
+          vehicle={vehicle}
+          currentKm={currentKm}
+          onClose={closeSearch}
+          onOpen={openSearchResult}
+        />
+      )}
     </div>
   );
 }

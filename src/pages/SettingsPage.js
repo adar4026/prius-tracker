@@ -165,7 +165,8 @@ export default function SettingsPage({
           </div>
           <div className="hint" style={{ marginTop: 0 }}>
             Данные хранятся только в этом браузере. Сохраняйте копию перед
-            переустановкой или сменой устройства.
+            переустановкой или сменой устройства. Фото автомобиля в резервную
+            копию не входит — его нужно добавить заново на новом устройстве.
           </div>
           <div className="settings-actions">
             <button type="button" className="btn btn--solid" onClick={exportJson}>
@@ -233,7 +234,7 @@ export default function SettingsPage({
           <div className="settings-row">
             <div className="settings-row__main">
               <div className="row__title">Очистить все данные</div>
-              <div className="row__sub">Удаляет заправки, ТО, задачи и сбрасывает данные автомобиля</div>
+              <div className="row__sub">Удаляет заправки, ТО, задачи, фото и сбрасывает данные автомобиля</div>
             </div>
           </div>
           {clearStep === 0 && (
@@ -258,8 +259,8 @@ export default function SettingsPage({
             <div className="notice notice--danger">
               <div className="row__title">Последнее подтверждение</div>
               <div className="row__sub" style={{ marginTop: 6 }}>
-                Будут удалены {fuel.length} заправок, {service.length} записей ТО
-                и {reminders.length} задач. Это действие нельзя отменить.
+                Будут удалены {fuel.length} заправок, {service.length} записей ТО,
+                {" "}{reminders.length} задач и фото автомобиля. Это действие нельзя отменить.
               </div>
               <div className="form-actions">
                 <button type="button" className="btn btn--ghost" onClick={() => setClearStep(0)}>Отмена</button>

@@ -6,7 +6,9 @@ import {
   kmLeftLabel, nearestDueLabel, num, reminderStatus, reminderUrgency,
 } from "../utils";
 
-export default function HomeTab({ fuel, service, reminders, currentKm, vehicle, onGo, onOpenVehicle }) {
+export default function HomeTab({
+  fuel, service, reminders, currentKm, vehicle, photoUrl, onGo, onOpenVehicle,
+}) {
   const points = consumptionPoints(fuel);
   const avgConsumption = avg(points.map((p) => p.consumption));
   const avgPrice = avg(fuel.map((f) => num(f.pricePerL)).filter((p) => p > 0));
@@ -138,7 +140,9 @@ export default function HomeTab({ fuel, service, reminders, currentKm, vehicle, 
 
       <div className="section-title">Автомобиль</div>
       <button type="button" className="card car-card" onClick={onOpenVehicle}>
-        <span className="car-card__icon">🚗</span>
+        <span className="car-card__icon" aria-hidden="true">
+          {photoUrl ? <img src={photoUrl} alt="" className="car-card__photo" /> : "🚗"}
+        </span>
         <span className="car-card__main">
           <span className="row__title">{vehicle.name}</span>
           <span className="row__sub">{vehicle.year} · {vehicle.fuelType}</span>

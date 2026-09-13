@@ -1,14 +1,17 @@
-import React, { useId } from "react";
+import React, { forwardRef, useId } from "react";
 import { ChevronIcon } from "./Icons";
 
 /**
  * Раскрывающаяся секция страницы «Автомобиль». Управляется снаружи
  * (open / onToggle), чтобы страница помнила состояние всех секций.
+ * ref указывает на корневой элемент — для прокрутки к секции из поиска.
  */
-export default function VehicleSection({ icon, title, summary, open, onToggle, children }) {
+const VehicleSection = forwardRef(function VehicleSection(
+  { icon, title, summary, open, onToggle, children }, ref
+) {
   const id = useId();
   return (
-    <section className={`vsec ${open ? "vsec--open" : ""}`}>
+    <section ref={ref} className={`vsec ${open ? "vsec--open" : ""}`}>
       <button
         type="button"
         className="vsec__head"
@@ -30,7 +33,9 @@ export default function VehicleSection({ icon, title, summary, open, onToggle, c
       )}
     </section>
   );
-}
+});
+
+export default VehicleSection;
 
 /** Строка «подпись — значение» внутри секции. */
 export function SpecRow({ label, value, action, color }) {

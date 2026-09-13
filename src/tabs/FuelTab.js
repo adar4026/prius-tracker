@@ -3,6 +3,7 @@ import Modal from "../components/Modal";
 import DateField from "../components/DateField";
 import JournalFilter from "../components/JournalFilter";
 import Stat from "../components/Stat";
+import useFocusEntry from "../components/useFocusEntry";
 import {
   avg, byDateDesc, byKmAsc, calcConsumption, entryYear, fmtDate, fmtKm, fmtMoney,
   fmtNum, fuelSearchText, isFull, matchesQuery, nextId, num, numOrNull,
@@ -41,12 +42,15 @@ const toForm = (e) => ({
   note: e.note || "",
 });
 
-export default function FuelTab({ fuel, setFuel, year, onYear }) {
+export default function FuelTab({ fuel, setFuel, year, onYear, focus, onFocused }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null); // редактируемая запись или null
   const [form, setForm] = useState(emptyForm());
   const [error, setError] = useState("");
+
+  // переход из глобального поиска: поиск журнала сбрасывается, год задаёт родитель
+  const flashId = useFocusEntry(focus, "fuel", () => setQuery(""), onFocused);
 
   const sorted = useMemo(() => [...fuel].sort(byDateDesc), [fuel]);
   const lastKm = useMemo(
@@ -239,7 +243,11 @@ export default function FuelTab({ fuel, setFuel, year, onYear }) {
         const prevKm = prevKmById.get(f.id);
         const distance = prevKm !== undefined ? f.km - prevKm : null;
         return (
-          <div key={f.id} className="item item--card fuel-card">
+          <div
+            key={f.id}
+            id={`fuel-${f.id}`}
+            className={`item item--card fuel-card ${flashId === f.id ? "item--flash" : ""}`}
+          >
             <div className="fuel-card__head">
               <span className="fuel-card__icon" aria-hidden="true">⛽</span>
               <span className="fuel-card__title">

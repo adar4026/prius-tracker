@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import Modal from "../components/Modal";
 import DateField from "../components/DateField";
+import useFocusEntry from "../components/useFocusEntry";
 import { REMINDER_ICONS } from "../data";
 import {
   fmtDate, fmtKm, nearestDueLabel, nextId, num, reminderStatus, reminderUrgency,
@@ -36,13 +37,16 @@ const emptyForm = () => ({
 });
 
 export default function RemindersTab({
-  reminders, setReminders, service, currentKm, onComplete,
+  reminders, setReminders, service, currentKm, onComplete, focus, onFocused,
 }) {
   const [filter, setFilter] = useState("all");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm());
   const [error, setError] = useState("");
+
+  // переход из глобального поиска: фильтр статуса сбрасывается, чтобы задача была видна
+  const flashId = useFocusEntry(focus, "reminder", () => setFilter("all"), onFocused);
 
   const withStatus = useMemo(
     () =>
@@ -179,7 +183,8 @@ export default function RemindersTab({
         return (
           <div
             key={r.id}
-            className={`item item--card reminder ${r.status === "overdue" ? "item--overdue" : ""} ${r.completed ? "item--done" : ""}`}
+            id={`reminder-${r.id}`}
+            className={`item item--card reminder ${r.status === "overdue" ? "item--overdue" : ""} ${r.completed ? "item--done" : ""} ${flashId === r.id ? "item--flash" : ""}`}
           >
             <span className="reminder__icon">{r.icon}</span>
             <div className="row__main">

@@ -4,6 +4,7 @@ import DateField from "../components/DateField";
 import JournalFilter from "../components/JournalFilter";
 import FilterMenu from "../components/FilterMenu";
 import NextServiceFields from "../components/NextServiceFields";
+import useFocusEntry from "../components/useFocusEntry";
 import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS } from "../data";
 import {
   addMonths, byDateDesc, elapsedLabel, entryYear, fmtDate, fmtKm, fmtMoney,
@@ -26,7 +27,7 @@ export const linkedReminder = (reminders, serviceId) =>
 
 export default function ServiceTab({
   service, setService, reminders, setReminders, currentKm,
-  year, onYear, draft, onDraftUsed,
+  year, onYear, draft, onDraftUsed, focus, onFocused,
 }) {
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
@@ -36,6 +37,11 @@ export default function ServiceTab({
   const [error, setError] = useState("");
   // задача, которую закроет сохраняемая запись (сценарий «Выполнить»)
   const [draftReminderId, setDraftReminderId] = useState(null);
+
+  // переход из глобального поиска: категория и поиск журнала сбрасываются, год задаёт родитель
+  const flashId = useFocusEntry(
+    focus, "service", () => { setFilter("all"); setQuery(""); }, onFocused
+  );
 
   const sorted = useMemo(() => [...service].sort(byDateDesc), [service]);
 
@@ -328,7 +334,11 @@ export default function ServiceTab({
       )}
 
       {visible.map((s) => (
-        <div key={s.id} className="item item--card item--striped">
+        <div
+          key={s.id}
+          id={`service-${s.id}`}
+          className={`item item--card item--striped ${flashId === s.id ? "item--flash" : ""}`}
+        >
           <span className="item__stripe" style={{ background: CATEGORY_COLORS[s.category] || "var(--border)" }} />
           <div className="row">
             <div className="row__main">

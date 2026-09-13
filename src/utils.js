@@ -40,6 +40,12 @@ export const fmtMoney = (v, digits = 2) =>
     ? "—"
     : `${v.toFixed(digits).replace(".", ",")} €`;
 
+// 12 500 € — целая сумма с разделителем тысяч, копейки только если они есть
+export const fmtPrice = (v) =>
+  v === null || v === undefined || !Number.isFinite(v)
+    ? "—"
+    : `${v.toLocaleString("ru-RU", { maximumFractionDigits: 2 })} €`;
+
 // 20,95 / 1,959 / 4,82
 export const fmtNum = (v, digits = 2) =>
   v === null || v === undefined || !Number.isFinite(v)

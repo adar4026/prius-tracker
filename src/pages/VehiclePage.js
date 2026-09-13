@@ -1,14 +1,14 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Header from "../components/Header";
-import DateField from "../components/DateField";
 import VehicleSection, { SpecRow } from "../components/VehicleSection";
-import { CopyIcon } from "../components/Icons";
+import VehicleEditor from "../components/VehicleEditor";
+import { CarIcon, CopyIcon, EditIcon } from "../components/Icons";
 import { useToast } from "../components/Toast";
 import { copyText } from "../clipboard";
 import {
   activeReminder, lastOilChange, lastService, migrateVehicle, validateVehicle,
 } from "../vehicle";
-import { fmtDate, fmtKm, kmLeftLabel, nearestDueLabel } from "../utils";
+import { fmtDate, fmtKm, fmtMoney, fmtPrice, kmLeftLabel, nearestDueLabel, num } from "../utils";
 
 const OIL_RE = /масл/i;
 const CVT_RE = /вариатор|atf|трансмис|cvt/i;
@@ -19,16 +19,30 @@ const INSURANCE_RE = /страхов/i;
 /** Строка «дата · пробег» для записи ТО. */
 const when = (s) => `${fmtDate(s.date)}${s.km ? ` · ${fmtKm(s.km)} км` : ""}`;
 
+/** Секции в порядке показа; по умолчанию раскрыт только паспорт. */
+const initialOpen = (section) => ({ passport: true, ...(section ? { [section]: true } : {}) });
+
 export default function VehiclePage({
-  vehicle, setVehicle, service, reminders, currentKm, onBack, onOpenService, onOpenReminders,
+  vehicle, setVehicle, photo, service, reminders, currentKm, initialSection,
+  onBack, onOpenService, onOpenReminders,
 }) {
-  // по умолчанию раскрыт только паспорт
-  const [open, setOpen] = useState({ passport: true });
+  const [open, setOpen] = useState(() => initialOpen(initialSection));
   const [form, setForm] = useState(null); // черновик редактирования или null
   const [errors, setErrors] = useState({});
   const [toast, showToast] = useToast();
+  const sectionRefs = useRef({});
 
   const toggle = (id) => setOpen((o) => ({ ...o, [id]: !o[id] }));
+
+  // переход из поиска: нужная секция раскрыта и подведена к верху экрана
+  useEffect(() => {
+    if (!initialSection) return undefined;
+    setOpen(initialOpen(initialSection));
+    const t = setTimeout(() => {
+      sectionRefs.current[initialSection]?.scrollIntoView({ block: "start", behavior: "smooth" });
+    }, 60);
+    return () => clearTimeout(t);
+  }, [initialSection]);
 
   // производные данные из журналов — только то, что реально есть в записях
   const derived = useMemo(() => {
@@ -46,15 +60,15 @@ export default function VehiclePage({
     };
   }, [service, reminders, currentKm]);
 
-  const copy = async (text, label) => {
-    showToast((await copyText(text)) ? `${label} скопирован` : "Буфер обмена недоступен");
+  const copy = async (text) => {
+    showToast((await copyText(text)) ? "Скопировано" : "Буфер обмена недоступен");
   };
 
   const copyBtn = (text, label) => (
     <button
       type="button"
       className="copy-btn"
-      onClick={() => copy(text, label)}
+      onClick={() => copy(text)}
       aria-label={`Скопировать ${label}`}
       title="Скопировать"
     >
@@ -81,166 +95,52 @@ export default function VehiclePage({
     setForm(null);
     setErrors({});
   };
-  const save = () => {
+
+  /**
+   * Сохранение: сначала фото (IndexedDB), затем профиль. Если фото не
+   * записалось, профиль не трогаем и остаёмся в редакторе с сообщением.
+   */
+  const save = async (photoDraft) => {
     const errs = validateVehicle(form);
     setErrors(errs);
-    if (Object.keys(errs).length) return;
+    if (Object.keys(errs).length) return false;
+
+    try {
+      if (photoDraft instanceof Blob) await photo.save(photoDraft);
+      else if (photoDraft === null) await photo.remove();
+    } catch {
+      setErrors({ photo: "Не удалось сохранить фото. Попробуйте ещё раз." });
+      return false;
+    }
+
     const next = migrateVehicle(form);
-    // текстовые поля сохраняются без крайних пробелов, VIN — заглавными
-    next.name = next.name.trim();
+    // текстовые поля сохраняются без крайних пробелов, коды — заглавными
+    ["name", "brand", "model", "modelFull", "plate", "year", "notes"].forEach((k) => {
+      next[k] = next[k].trim();
+    });
+    if (!next.name) next.name = [next.brand, next.model].filter(Boolean).join(" ");
     next.vin = next.vin.trim().toUpperCase();
-    next.plate = next.plate.trim();
-    next.year = next.year.trim();
     next.version = next.version.trim().toUpperCase();
     next.parts.inverter = next.parts.inverter.trim().toUpperCase();
     next.parts.battery12v = next.parts.battery12v.trim().toUpperCase();
+    Object.keys(next.docs).forEach((k) => { next.docs[k] = next.docs[k].trim(); });
     setVehicle(next);
     setForm(null);
     showToast("Сохранено");
+    return true;
   };
-
-  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
-  const setIn = (grp, key) => (e) => {
-    const value = e && e.target ? e.target.value : e;
-    setForm((f) => ({ ...f, [grp]: { ...f[grp], [key]: value } }));
-  };
-
-  const field = (label, value, onChange, opts = {}) => (
-    <div className="field">
-      <label htmlFor={opts.id}>{label}</label>
-      {opts.textarea ? (
-        <textarea id={opts.id} rows={3} value={value} onChange={onChange} />
-      ) : (
-        <input
-          id={opts.id}
-          type="text"
-          className={opts.mono ? "mono" : undefined}
-          value={value}
-          onChange={onChange}
-          placeholder={opts.placeholder}
-          inputMode={opts.inputMode}
-          autoCapitalize={opts.autoCapitalize}
-        />
-      )}
-      {opts.error && <div className="hint" style={{ color: "var(--red)" }}>{opts.error}</div>}
-    </div>
-  );
 
   if (form) {
     return (
       <>
-        <Header
-          title="Редактирование"
-          onBack={cancelEdit}
-          action={
-            <button type="button" className="header__text-btn" onClick={save}>
-              Сохранить
-            </button>
-          }
+        <VehicleEditor
+          form={form}
+          setForm={setForm}
+          errors={errors}
+          photoUrl={photo.url}
+          onCancel={cancelEdit}
+          onSave={save}
         />
-        <main className="screen page">
-          <div className="section-title">Автомобиль</div>
-          <div className="card card--form">
-            {field("Название", form.name, set("name"), { id: "v-name", error: errors.name })}
-            {field("Полное наименование", form.modelFull, set("modelFull"), { id: "v-model" })}
-            {field("Версия", form.version, set("version"), { id: "v-version", mono: true, autoCapitalize: "characters" })}
-            <div className="form-row">
-              {field("Год выпуска", form.year, set("year"), { id: "v-year", inputMode: "numeric", error: errors.year })}
-              <div className="field">
-                <label htmlFor="v-first-reg">Первая регистрация</label>
-                <DateField
-                  id="v-first-reg"
-                  label="Первая регистрация"
-                  value={form.docs.firstRegistration}
-                  onChange={setIn("docs", "firstRegistration")}
-                />
-                {errors.firstRegistration && (
-                  <div className="hint" style={{ color: "var(--red)" }}>{errors.firstRegistration}</div>
-                )}
-              </div>
-            </div>
-            <div className="form-row">
-              {field("Тип (кратко)", form.fuelType, set("fuelType"), { id: "v-fuel" })}
-              {field("Мощность", form.power, set("power"), { id: "v-power" })}
-            </div>
-            {field("Тип (полностью)", form.driveType, set("driveType"), { id: "v-drive" })}
-            <div className="form-row">
-              {field("Двигатель", form.engineCode, set("engineCode"), { id: "v-engine-code", mono: true })}
-              {field("Силовая установка", form.engine, set("engine"), { id: "v-engine" })}
-            </div>
-            {field("VIN", form.vin, set("vin"), { id: "v-vin", mono: true, autoCapitalize: "characters", error: errors.vin })}
-            <div className="form-row">
-              {field("Госномер", form.plate, set("plate"), { id: "v-plate", mono: true, autoCapitalize: "characters" })}
-              {field("Кузов", form.body, set("body"), { id: "v-body", mono: true })}
-            </div>
-            {field("Цвет кузова (код)", form.color, set("color"), { id: "v-color", mono: true })}
-          </div>
-
-          <div className="section-title">Моторное масло</div>
-          <div className="card card--form">
-            {field("Рекомендованное масло", form.oil.grade, setIn("oil", "grade"), { id: "v-oil-grade" })}
-            <div className="form-row">
-              {field("Объём без фильтра", form.oil.volumeNoFilter, setIn("oil", "volumeNoFilter"), { id: "v-oil-vol0" })}
-              {field("Объём с фильтром", form.oil.volume, setIn("oil", "volume"), { id: "v-oil-vol" })}
-            </div>
-            {field("Масляный фильтр", form.oil.filter, setIn("oil", "filter"), { id: "v-oil-filter" })}
-          </div>
-
-          <div className="section-title">Трансмиссия</div>
-          <div className="card card--form">
-            <div className="form-row">
-              {field("Масло", form.transmission.fluid, setIn("transmission", "fluid"), { id: "v-cvt-fluid" })}
-              {field("Объём (частичная замена)", form.transmission.volume, setIn("transmission", "volume"), { id: "v-cvt-vol" })}
-            </div>
-          </div>
-
-          <div className="section-title">Охлаждающие жидкости</div>
-          <div className="card card--form">
-            {field("Двигатель", form.coolant.engine, setIn("coolant", "engine"), { id: "v-cool-engine" })}
-            {field("Инвертор", form.coolant.inverter, setIn("coolant", "inverter"), { id: "v-cool-inv" })}
-          </div>
-
-          <div className="section-title">Колёса и шины</div>
-          <div className="card card--form">
-            <div className="form-row">
-              {field("Сверловка", form.tires.pcd, setIn("tires", "pcd"), { id: "v-tire-pcd" })}
-              {field("Штатные диски", form.tires.rims, setIn("tires", "rims"), { id: "v-tire-rims" })}
-            </div>
-            <div className="form-row">
-              {field("Штатные шины", form.tires.stock, setIn("tires", "stock"), { id: "v-tire-stock" })}
-              {field("Текущие шины", form.tires.current, setIn("tires", "current"), { id: "v-tire-cur" })}
-            </div>
-            {field("Запасное колесо", form.tires.spare, setIn("tires", "spare"), { id: "v-tire-spare" })}
-          </div>
-
-          <div className="section-title">Номера деталей</div>
-          <div className="card card--form">
-            {field("Инвертор", form.parts.inverter, setIn("parts", "inverter"), { id: "v-part-inv", mono: true, autoCapitalize: "characters" })}
-            {field("Аккумулятор 12 V", form.parts.battery12v, setIn("parts", "battery12v"), { id: "v-part-bat", mono: true, autoCapitalize: "characters" })}
-          </div>
-
-          <div className="section-title">Документы и заметки</div>
-          <div className="card card--form">
-            <div className="field">
-              <label htmlFor="v-purchase">Дата покупки</label>
-              <DateField
-                id="v-purchase"
-                label="Дата покупки"
-                value={form.docs.purchaseDate}
-                onChange={setIn("docs", "purchaseDate")}
-              />
-              {errors.purchaseDate && (
-                <div className="hint" style={{ color: "var(--red)" }}>{errors.purchaseDate}</div>
-              )}
-            </div>
-            {field("Заметки", form.notes, set("notes"), { id: "v-notes", textarea: true })}
-          </div>
-
-          <div className="form-actions">
-            <button type="button" className="btn btn--ghost" onClick={cancelEdit}>Отмена</button>
-            <button type="button" className="btn btn--solid" onClick={save}>Сохранить</button>
-          </div>
-        </main>
         {toast}
       </>
     );
@@ -252,68 +152,144 @@ export default function VehiclePage({
     ? "var(--muted)"
     : derived.oilLeft.overdue ? "var(--red)" : "var(--green)";
 
+  const docs = vehicle.docs;
   const hasDocs = derived.itvLast || derived.itvNext || derived.insurance
-    || vehicle.docs.firstRegistration || vehicle.docs.purchaseDate;
+    || docs.itvUntil || docs.insuranceCompany || docs.insuranceUntil || docs.other;
+  const hasPurchase = docs.purchaseDate || docs.purchaseKm || docs.purchasePrice;
+  const purchaseKm = num(docs.purchaseKm);
+
+  const heroDate = docs.firstRegistration ? fmtDate(docs.firstRegistration) : vehicle.year;
+
+  // основные данные — только заполненные поля
+  const mainSpecs = [
+    ["Марка", vehicle.brand],
+    ["Модель", vehicle.model],
+    ["Дата первой регистрации", docs.firstRegistration ? fmtDate(docs.firstRegistration) : ""],
+    ["Тип топлива", vehicle.driveType || vehicle.fuelType],
+    ["Мощность", vehicle.power.replace(" / ", " · ")],
+    ["Версия", vehicle.version, true],
+    ["Двигатель", vehicle.engineCode, true],
+    ["Цвет кузова", vehicle.color, true],
+  ].filter(([, value]) => value);
+
+  const bindSection = (id) => (node) => { sectionRefs.current[id] = node; };
 
   return (
     <>
       <Header
-        title="Автомобиль"
+        title={vehicle.name}
         onBack={onBack}
         action={
-          <button type="button" className="header__text-btn" onClick={startEdit}>
-            Редактировать
+          <button
+            type="button"
+            className="header__btn"
+            onClick={startEdit}
+            aria-label="Редактировать профиль автомобиля"
+            title="Редактировать"
+          >
+            <EditIcon />
           </button>
         }
       />
       <main className="screen page">
         <div className="card vehicle-hero">
-          <div className="vehicle-hero__icon" aria-hidden="true">🚗</div>
-          <div className="vehicle-hero__name">{vehicle.name}</div>
-          <div className="vehicle-hero__sub">{vehicle.year} · {vehicle.fuelType}</div>
-          <div className="vehicle-hero__km">
-            Текущий пробег: <b>{fmtKm(currentKm)} км</b>
+          {photo.url ? (
+            <img src={photo.url} alt={vehicle.name} className="vehicle-photo" />
+          ) : (
+            <div className="vehicle-photo vehicle-photo--empty">
+              <span className="vehicle-photo__icon" aria-hidden="true"><CarIcon size={44} /></span>
+              {!photo.loading && (
+                <button type="button" className="btn btn--mini vehicle-photo__add" onClick={startEdit}>
+                  Добавить фото автомобиля
+                </button>
+              )}
+            </div>
+          )}
+          <div className="vehicle-hero__body">
+            <div className="vehicle-hero__name">{vehicle.name}</div>
+            <div className="vehicle-hero__sub">{heroDate} · {vehicle.fuelType}</div>
+            <div className="vehicle-hero__km">
+              Текущий пробег: <b>{fmtKm(currentKm)} км</b>
+            </div>
           </div>
+        </div>
+
+        {mainSpecs.length > 0 && (
+          <>
+            <div className="section-title">Основные данные</div>
+            <div className="card vehicle-main">
+              <dl className="spec-grid">
+                {mainSpecs.map(([label, value, isMono]) => (
+                  <div key={label} className="spec-grid__cell">
+                    <dt>{label}</dt>
+                    <dd>{isMono ? mono(value) : value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          </>
+        )}
+
+        <div className="section-title">Покупка и пробег</div>
+        <div className="card vehicle-main">
+          <dl className="spec-list">
+            {docs.purchaseDate && <SpecRow label="Дата покупки" value={fmtDate(docs.purchaseDate)} />}
+            {docs.purchaseKm && <SpecRow label="Пробег при покупке" value={`${fmtKm(purchaseKm)} км`} />}
+            {docs.purchasePrice && <SpecRow label="Цена покупки" value={fmtPrice(num(docs.purchasePrice))} />}
+            <SpecRow label="Текущий пробег" value={`${fmtKm(currentKm)} км`} color="var(--accent)" />
+            {docs.purchaseKm && currentKm >= purchaseKm && (
+              <SpecRow label="Пройдено с покупки" value={`${fmtKm(currentKm - purchaseKm)} км`} />
+            )}
+          </dl>
+          {!hasPurchase && (
+            <button type="button" className="link-btn" onClick={startEdit}>
+              Добавить данные о покупке
+            </button>
+          )}
         </div>
 
         <div className="vsec-list">
           <VehicleSection
-            icon="📘" title="Паспорт автомобиля"
-            summary={`${vehicle.modelFull} · ${vehicle.year}`}
+            ref={bindSection("passport")}
+            icon="📘" title="Паспорт и идентификация"
+            summary={`${vehicle.vin} · ${vehicle.plate}`}
             open={!!open.passport} onToggle={() => toggle("passport")}
           >
             <dl className="spec-list">
-              <SpecRow label="Модель" value={vehicle.modelFull} />
+              <SpecRow label="VIN" value={mono(vehicle.vin)} action={copyBtn(vehicle.vin, "VIN")} />
+              <SpecRow label="Госномер" value={mono(vehicle.plate)} action={copyBtn(vehicle.plate, "госномер")} />
+              <SpecRow label="Автомобиль" value={vehicle.modelFull} />
               {vehicle.version && <SpecRow label="Версия" value={mono(vehicle.version)} />}
-              <SpecRow label="Год выпуска" value={vehicle.year} />
-              {vehicle.docs.firstRegistration && (
-                <SpecRow label="Первая регистрация" value={fmtDate(vehicle.docs.firstRegistration)} />
-              )}
               <SpecRow label="Двигатель" value={mono(vehicle.engineCode)} />
               {vehicle.engine && <SpecRow label="Силовая установка" value={vehicle.engine} />}
               <SpecRow label="Тип" value={vehicle.driveType || vehicle.fuelType} />
               {vehicle.power && <SpecRow label="Мощность" value={vehicle.power} />}
-              <SpecRow label="Кузов" value={mono(vehicle.body)} />
-              <SpecRow label="VIN" value={mono(vehicle.vin)} action={copyBtn(vehicle.vin, "VIN")} />
-              <SpecRow label="Госномер" value={mono(vehicle.plate)} action={copyBtn(vehicle.plate, "Госномер")} />
-              {vehicle.color && <SpecRow label="Цвет кузова" value={mono(vehicle.color)} />}
+              {vehicle.color && <SpecRow label="Код цвета" value={mono(vehicle.color)} />}
+              {vehicle.body && <SpecRow label="Кузов" value={mono(vehicle.body)} />}
+              <SpecRow label="Год выпуска" value={vehicle.year} />
               {vehicle.notes && <SpecRow label="Заметки" value={vehicle.notes} />}
             </dl>
           </VehicleSection>
 
           <VehicleSection
+            ref={bindSection("oil")}
             icon="🛢️" title="Моторное масло"
             summary={`${vehicle.oil.grade} · ${vehicle.oil.volume} с фильтром`}
             open={!!open.oil} onToggle={() => toggle("oil")}
           >
             <dl className="spec-list">
-              <SpecRow label="Масло" value={vehicle.oil.grade} />
+              <SpecRow label="Рекомендованное масло" value={vehicle.oil.grade} />
               {vehicle.oil.volumeNoFilter && (
                 <SpecRow label="Объём без фильтра" value={vehicle.oil.volumeNoFilter} />
               )}
               <SpecRow label="Объём с фильтром" value={vehicle.oil.volume} />
-              <SpecRow label="Масляный фильтр" value={vehicle.oil.filter} />
-              {derived.oil && <SpecRow label="Последняя замена" value={when(derived.oil)} />}
+              <SpecRow label="Фильтры" value={vehicle.oil.filter} />
+              {derived.oil && (
+                <SpecRow label="Последняя замена" value={when(derived.oil)} action={serviceLink(derived.oil)} />
+              )}
+              {derived.oil && derived.oil.cost !== null && (
+                <SpecRow label="Стоимость замены" value={fmtMoney(derived.oil.cost, derived.oil.cost % 1 ? 2 : 0)} />
+              )}
               {derived.oilLeft && (
                 <SpecRow label="Статус" value={derived.oilLeft.text} color={oilColor} />
               )}
@@ -324,13 +300,14 @@ export default function VehiclePage({
           </VehicleSection>
 
           <VehicleSection
+            ref={bindSection("cvt")}
             icon="⚙️" title="Трансмиссия"
             summary={vehicle.transmission.fluid}
             open={!!open.cvt} onToggle={() => toggle("cvt")}
           >
             <dl className="spec-list">
               <SpecRow label="Масло" value={vehicle.transmission.fluid} />
-              <SpecRow label="Частичная замена" value={vehicle.transmission.volume} />
+              <SpecRow label="Объём при частичной замене" value={vehicle.transmission.volume} />
               {derived.cvt && (
                 <SpecRow label="Последняя замена" value={when(derived.cvt)} action={serviceLink(derived.cvt)} />
               )}
@@ -339,6 +316,7 @@ export default function VehiclePage({
           </VehicleSection>
 
           <VehicleSection
+            ref={bindSection("coolant")}
             icon="❄️" title="Охлаждающие жидкости"
             summary={derived.coolant ? `Замена ${fmtDate(derived.coolant.date)}` : "Двигатель и инвертор"}
             open={!!open.coolant} onToggle={() => toggle("coolant")}
@@ -354,6 +332,7 @@ export default function VehiclePage({
           </VehicleSection>
 
           <VehicleSection
+            ref={bindSection("tires")}
             icon="🛞" title="Колёса и шины"
             summary={`Сейчас ${vehicle.tires.current}`}
             open={!!open.tires} onToggle={() => toggle("tires")}
@@ -372,12 +351,13 @@ export default function VehiclePage({
           </VehicleSection>
 
           <VehicleSection
+            ref={bindSection("parts")}
             icon="🔩" title="Важные номера деталей"
             summary={`Инвертор ${vehicle.parts.inverter}`}
             open={!!open.parts} onToggle={() => toggle("parts")}
           >
             <dl className="spec-list">
-              <SpecRow label="Инвертор" value={mono(vehicle.parts.inverter)} action={copyBtn(vehicle.parts.inverter, "Номер инвертора")} />
+              <SpecRow label="Инвертор" value={mono(vehicle.parts.inverter)} action={copyBtn(vehicle.parts.inverter, "номер инвертора")} />
               {vehicle.parts.battery12v && (
                 <SpecRow label="Аккумулятор 12 V" value={mono(vehicle.parts.battery12v)} />
               )}
@@ -385,8 +365,13 @@ export default function VehiclePage({
           </VehicleSection>
 
           <VehicleSection
+            ref={bindSection("docs")}
             icon="📋" title="Документы и даты"
-            summary={derived.insurance?.dueDate ? `Страховка до ${fmtDate(derived.insurance.dueDate)}` : "ITV, страховка, покупка"}
+            summary={
+              docs.insuranceUntil ? `Страховка до ${fmtDate(docs.insuranceUntil)}`
+              : derived.insurance?.dueDate ? `Страховка до ${fmtDate(derived.insurance.dueDate)}`
+              : "ITV, страховка"
+            }
             open={!!open.docs} onToggle={() => toggle("docs")}
           >
             {hasDocs ? (
@@ -394,7 +379,17 @@ export default function VehiclePage({
                 {derived.itvLast && (
                   <SpecRow label="ITV пройден" value={when(derived.itvLast)} action={serviceLink(derived.itvLast)} />
                 )}
-                {derived.itvNext?.dueDate && (() => {
+                {docs.itvUntil && (() => {
+                  const left = nearestDueLabel({ dueDate: docs.itvUntil }, currentKm);
+                  return (
+                    <SpecRow
+                      label="ITV действует до"
+                      value={`${fmtDate(docs.itvUntil)}${left ? ` · ${left.text}` : ""}`}
+                      color={left?.overdue ? "var(--red)" : undefined}
+                    />
+                  );
+                })()}
+                {!docs.itvUntil && derived.itvNext?.dueDate && (() => {
                   const left = nearestDueLabel(derived.itvNext, currentKm);
                   return (
                     <SpecRow
@@ -404,7 +399,18 @@ export default function VehiclePage({
                     />
                   );
                 })()}
-                {derived.insurance?.dueDate && (() => {
+                {docs.insuranceCompany && <SpecRow label="Страховая компания" value={docs.insuranceCompany} />}
+                {docs.insuranceUntil && (() => {
+                  const left = nearestDueLabel({ dueDate: docs.insuranceUntil }, currentKm);
+                  return (
+                    <SpecRow
+                      label="Страховка до"
+                      value={`${fmtDate(docs.insuranceUntil)}${left ? ` · ${left.text}` : ""}`}
+                      color={left?.overdue ? "var(--red)" : undefined}
+                    />
+                  );
+                })()}
+                {!docs.insuranceUntil && derived.insurance?.dueDate && (() => {
                   const left = nearestDueLabel(derived.insurance, currentKm);
                   return (
                     <SpecRow
@@ -414,23 +420,18 @@ export default function VehiclePage({
                     />
                   );
                 })()}
-                {derived.insurance?.note && <SpecRow label="Заметка" value={derived.insurance.note} />}
-                {vehicle.docs.firstRegistration && (
-                  <SpecRow label="Первая регистрация" value={fmtDate(vehicle.docs.firstRegistration)} />
+                {derived.insurance?.note && !docs.insuranceCompany && (
+                  <SpecRow label="Заметка" value={derived.insurance.note} />
                 )}
-                {vehicle.docs.purchaseDate && (
-                  <SpecRow label="Дата покупки" value={fmtDate(vehicle.docs.purchaseDate)} />
-                )}
+                {docs.other && <SpecRow label="Другие документы" value={docs.other} />}
               </dl>
             ) : (
               <div className="hint">Пока нет сохранённых документов.</div>
             )}
             <div className="vsec__actions">
-              {!vehicle.docs.purchaseDate && (
-                <button type="button" className="link-btn" onClick={startEdit}>
-                  Добавить дату покупки
-                </button>
-              )}
+              <button type="button" className="link-btn" onClick={startEdit}>
+                {hasDocs ? "Изменить документы" : "Добавить документы"}
+              </button>
               <button type="button" className="link-btn" onClick={onOpenReminders}>
                 Все задачи и сроки
               </button>

@@ -12,7 +12,7 @@ const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabi
  * кнопке ✕, свайпу влево и Escape.
  */
 export default function SideDrawer({
-  open, onClose, items, active, onSelect, vehicle, currentKm, version,
+  open, onClose, items, active, onSelect, vehicle, photoUrl, currentKm, version,
 }) {
   const panelRef = useRef(null);
   const closeRef = useRef(null);
@@ -134,7 +134,9 @@ export default function SideDrawer({
           aria-label="Открыть страницу автомобиля"
           tabIndex={open ? 0 : -1}
         >
-          <span className="drawer__car-icon" aria-hidden="true">🚗</span>
+          <span className="drawer__car-icon" aria-hidden="true">
+            {photoUrl ? <img src={photoUrl} alt="" className="drawer__car-photo" /> : "🚗"}
+          </span>
           <span className="drawer__car-main">
             <span className="drawer__car-name">{vehicle.name}</span>
             <span className="drawer__car-sub">{vehicle.year} · {vehicle.fuelType}</span>

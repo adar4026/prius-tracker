@@ -9,12 +9,14 @@ import { byDateDesc } from "./utils";
 
 export const VEHICLE_DEFAULTS = {
   name: "Toyota Prius+",
+  brand: "Toyota",
+  model: "Prius+",
   modelFull: "Toyota Prius+ 1.8 VVT-i HSD Advance",
   version: "ZVW40L-AWXEBW",
   year: "2012",
   // короткий тип для карточек и полное описание для паспорта
   fuelType: "Гибрид",
-  driveType: "Гибрид (бензин + электродвигатель)",
+  driveType: "Гибрид (бензин + электричество)",
   engine: "1.8 VVT-i HSD",
   engineCode: "2ZR-FXE",
   power: "136 CV / 99,96 kW",
@@ -49,8 +51,14 @@ export const VEHICLE_DEFAULTS = {
   },
   docs: {
     firstRegistration: "2012-12-27",
-    // дата покупки показывается только если пользователь её сохранил
+    // покупка и документы показываются только если пользователь их заполнил
     purchaseDate: "",
+    purchaseKm: "",
+    purchasePrice: "",
+    itvUntil: "",
+    insuranceCompany: "",
+    insuranceUntil: "",
+    other: "",
   },
   notes: "",
 };
@@ -61,6 +69,7 @@ export const VEHICLE_DEFAULTS = {
 const LEGACY_DEFAULTS = {
   modelFull: "Toyota Prius+ / Prius v",
   engine: "1.8 Hybrid 136 CV",
+  driveType: "Гибрид (бензин + электродвигатель)",
   "transmission.volume": "~3,4 л",
   "tires.pcd": "5×114,3",
   "tires.current": "205/60 R16",
@@ -72,6 +81,23 @@ const str = (v, fallback) => (typeof v === "string" ? v : fallback);
 const pick = (saved, key, fallback, path = key) => {
   const value = str(saved[key], fallback);
   return path in LEGACY_DEFAULTS && value === LEGACY_DEFAULTS[path] ? fallback : value;
+};
+
+/**
+ * Марка и модель появились позже названия. У профиля без этих полей они
+ * выводятся из названия («Toyota Prius+» → Toyota / Prius+), чтобы
+ * переименованный пользователем автомобиль не получил чужую марку.
+ */
+const splitBrand = (saved, name) => {
+  const hasBrand = typeof saved.brand === "string" || typeof saved.model === "string";
+  if (hasBrand) {
+    return { brand: str(saved.brand, ""), model: str(saved.model, "") };
+  }
+  if (name === VEHICLE_DEFAULTS.name) {
+    return { brand: VEHICLE_DEFAULTS.brand, model: VEHICLE_DEFAULTS.model };
+  }
+  const [brand, ...rest] = name.trim().split(/\s+/);
+  return { brand: brand || "", model: rest.join(" ") };
 };
 
 const group = (saved, name, defaults) => {
@@ -88,8 +114,10 @@ const group = (saved, name, defaults) => {
 export function migrateVehicle(raw) {
   const v = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
   const d = VEHICLE_DEFAULTS;
+  const name = pick(v, "name", d.name);
   return {
-    name: pick(v, "name", d.name),
+    name,
+    ...splitBrand(v, name),
     modelFull: pick(v, "modelFull", d.modelFull),
     version: pick(v, "version", d.version),
     year: pick(v, "year", d.year),
@@ -134,6 +162,19 @@ export function validateVehicle(v) {
   }
   if (v.docs.firstRegistration.trim() && !isoDate.test(v.docs.firstRegistration.trim())) {
     errors.firstRegistration = "Дата в формате ГГГГ-ММ-ДД";
+  }
+  if (v.docs.itvUntil.trim() && !isoDate.test(v.docs.itvUntil.trim())) {
+    errors.itvUntil = "Дата в формате ГГГГ-ММ-ДД";
+  }
+  if (v.docs.insuranceUntil.trim() && !isoDate.test(v.docs.insuranceUntil.trim())) {
+    errors.insuranceUntil = "Дата в формате ГГГГ-ММ-ДД";
+  }
+  const numeric = /^\d+([.,]\d+)?$/;
+  if (v.docs.purchaseKm.trim() && !/^\d+$/.test(v.docs.purchaseKm.trim())) {
+    errors.purchaseKm = "Пробег — целое число километров";
+  }
+  if (v.docs.purchasePrice.trim() && !numeric.test(v.docs.purchasePrice.trim())) {
+    errors.purchasePrice = "Цена — число, например 12500";
   }
   return errors;
 }
