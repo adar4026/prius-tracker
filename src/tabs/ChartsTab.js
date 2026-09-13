@@ -3,6 +3,7 @@ import {
   Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
+import Stat from "../components/Stat";
 import { chartColors } from "../themes";
 import {
   avg, byKmAsc, consumptionPoints, fmtMoney, fmtNum, isFull, monthLabel, num,
@@ -12,12 +13,13 @@ import {
 const MODES = [
   { id: "consumption", label: "Расход" },
   { id: "price", label: "Цена" },
-  { id: "months", label: "По месяцам" },
+  { id: "months", label: "Месяцы" },
+  { id: "costs", label: "Затраты" },
 ];
 
 const shortDate = (iso) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}`;
 
-export default function ChartsTab({ fuel, theme }) {
+export default function ChartsTab({ fuel, service, theme }) {
   const [mode, setMode] = useState("consumption");
   const c = chartColors(theme);
 
@@ -69,6 +71,12 @@ export default function ChartsTab({ fuel, theme }) {
       .sort((a, b) => a.key.localeCompare(b.key))
       .map((m) => ({ ...m, avgCons: m.cons.length ? avg(m.cons) : null }));
   }, [fuel]);
+
+  // итоговые суммы — те же, что раньше стояли на главной
+  const totalFuel = useMemo(() => fuel.reduce((s, f) => s + num(f.paidTotal), 0), [fuel]);
+  const totalService = useMemo(() => service.reduce((s, r) => s + num(r.cost), 0), [service]);
+  const totalCosts = totalFuel + totalService;
+  const fuelShare = totalCosts > 0 ? Math.round((totalFuel / totalCosts) * 100) : 0;
 
   return (
     <main className="screen">
@@ -185,6 +193,39 @@ export default function ChartsTab({ fuel, theme }) {
                 {fmtNum(Math.max(...prices.map((p) => p.price)), 3)}
                 <span className="stat__unit">€/л</span>
               </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {mode === "costs" && totalCosts === 0 && (
+        <div className="empty">Нет данных о расходах</div>
+      )}
+
+      {mode === "costs" && totalCosts > 0 && (
+        <>
+          <div className="card hero">
+            <div className="hero__label">Всего расходов</div>
+            <div className="hero__value">{fmtMoney(totalCosts, 0)}</div>
+            <div className="hero__note">Топливо + ТО и ремонт</div>
+          </div>
+
+          <div className="grid-2" style={{ marginTop: 10 }}>
+            <Stat icon="⛽" label="Топливо" value={fmtMoney(totalFuel, 0)} color="var(--gold)" />
+            <Stat icon="🔧" label="ТО и ремонт" value={fmtMoney(totalService, 0)} color="var(--blue)" />
+          </div>
+
+          <div className="card" style={{ marginTop: 10 }}>
+            <div className="progress__head">
+              <span className="progress__title">Распределение</span>
+            </div>
+            <div className="bar split">
+              <div className="split__part" style={{ width: `${fuelShare}%`, background: "var(--gold)" }} />
+              <div className="split__part" style={{ flex: 1, background: "var(--blue)" }} />
+            </div>
+            <div className="progress__meta">
+              <span style={{ color: "var(--gold)" }}>Топливо {fuelShare}%</span>
+              <span style={{ color: "var(--blue)" }}>ТО и ремонт {100 - fuelShare}%</span>
             </div>
           </div>
         </>

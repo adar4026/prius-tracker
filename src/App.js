@@ -135,7 +135,7 @@ export default function App() {
       {tab === "fuel" && (
         <FuelTab fuel={fuel} setFuel={setFuel} year={year} onYear={setYear} />
       )}
-      {tab === "charts" && <ChartsTab fuel={fuel} theme={safeTheme} />}
+      {tab === "charts" && <ChartsTab fuel={fuel} service={service} theme={safeTheme} />}
       {tab === "service" && (
         <ServiceTab
           service={service}

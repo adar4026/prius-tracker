@@ -18,9 +18,7 @@ export default function HomeTab({ fuel, service, reminders, currentKm, onGo }) {
 
   const points = consumptionPoints(fuel);
   const avgConsumption = avg(points.map((p) => p.consumption));
-  const totalPaid = fuel.reduce((s, f) => s + num(f.paidTotal), 0);
   const avgPrice = avg(fuel.map((f) => num(f.pricePerL)).filter((p) => p > 0));
-  const totalService = service.reduce((s, r) => s + num(r.cost), 0);
 
   const oil = lastOilChange(service);
   // прогресс ведём от того же dueKm, что и в задаче "Моторное масло 0W-20" —
@@ -57,8 +55,6 @@ export default function HomeTab({ fuel, service, reminders, currentKm, onGo }) {
       <div className="grid-2" style={{ marginTop: 10 }}>
         <Stat icon="⛽" label="Средний расход" value={fmtNum(avgConsumption, 2)} unit="л/100 км" color="var(--green)" />
         <Stat icon="💶" label="Средняя цена" value={fmtNum(avgPrice, 3)} unit="€/л" color="var(--blue)" />
-        <Stat icon="🛢" label="Топливо всего" value={fmtMoney(totalPaid, 0)} />
-        <Stat icon="🔧" label="ТО всего" value={fmtMoney(totalService, 0)} />
       </div>
 
       {oil && (

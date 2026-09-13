@@ -166,6 +166,8 @@ button, input, select, textarea {
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
+/* соседние карточки в сетке не должны ловить отступ от .card + .card */
+.grid-2 > .card { margin-top: 0; }
 
 .stat { padding: 12px; }
 .stat__label {
@@ -207,6 +209,9 @@ button, input, select, textarea {
   border-radius: 999px;
   transition: width 0.4s ease;
 }
+
+.split { display: flex; }
+.split__part { height: 100%; }
 
 .progress__meta {
   display: flex;
@@ -355,6 +360,7 @@ button, input, select, textarea {
   background: transparent;
   color: var(--muted);
   font-size: 13px;
+  white-space: nowrap;
   cursor: pointer;
 }
 .seg button.active {
