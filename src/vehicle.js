@@ -9,74 +9,106 @@ import { byDateDesc } from "./utils";
 
 export const VEHICLE_DEFAULTS = {
   name: "Toyota Prius+",
-  modelFull: "Toyota Prius+ / Prius v",
+  modelFull: "Toyota Prius+ 1.8 VVT-i HSD Advance",
+  version: "ZVW40L-AWXEBW",
   year: "2012",
+  // короткий тип для карточек и полное описание для паспорта
   fuelType: "Гибрид",
-  engine: "1.8 Hybrid 136 CV",
+  driveType: "Гибрид (бензин + электродвигатель)",
+  engine: "1.8 VVT-i HSD",
   engineCode: "2ZR-FXE",
+  power: "136 CV / 99,96 kW",
   body: "XW40",
   vin: "JTDZS3EU003044352",
   plate: "7722 JWB",
   color: "1G3",
   oil: {
     grade: "0W-20",
-    volume: "4,2 л",
+    volumeNoFilter: "3,9 л",
+    volume: "4,2 л", // полный объём при замене фильтра
     filter: "Toyota 04152-YZZA6 / MANN HU6006z",
   },
   transmission: {
     fluid: "Toyota ATF WS",
-    volume: "~3,4 л",
+    volume: "3,4 л", // при частичной замене
   },
   coolant: {
     engine: "Toyota SLLC, ~7,2 л",
     inverter: "Toyota SLLC, ~2,1 л",
   },
   tires: {
+    pcd: "PCD 114,3 × 5",
+    rims: "7J",
     stock: "215/50 R17",
-    current: "205/60 R16",
-    pcd: "5×114,3",
+    current: "205/60 R16 91V",
+    spare: "Temporary 135/70 D17",
   },
   parts: {
     inverter: "G9200-47162",
+    battery12v: "S46B24R",
   },
   docs: {
+    firstRegistration: "2012-12-27",
     // дата покупки показывается только если пользователь её сохранил
     purchaseDate: "",
   },
   notes: "",
 };
 
+// Значения по умолчанию из предыдущей версии модели. Если в сохранённом
+// профиле поле совпадает со старым дефолтом, пользователь его не менял —
+// такое поле безопасно обновить до нового справочного значения.
+const LEGACY_DEFAULTS = {
+  modelFull: "Toyota Prius+ / Prius v",
+  engine: "1.8 Hybrid 136 CV",
+  "transmission.volume": "~3,4 л",
+  "tires.pcd": "5×114,3",
+  "tires.current": "205/60 R16",
+};
+
 const str = (v, fallback) => (typeof v === "string" ? v : fallback);
 
-const group = (saved, defaults) => {
+/** Поле профиля: отсутствует → дефолт; равно старому дефолту → новый дефолт; иначе как есть. */
+const pick = (saved, key, fallback, path = key) => {
+  const value = str(saved[key], fallback);
+  return path in LEGACY_DEFAULTS && value === LEGACY_DEFAULTS[path] ? fallback : value;
+};
+
+const group = (saved, name, defaults) => {
   const src = saved && typeof saved === "object" ? saved : {};
   return Object.fromEntries(
-    Object.keys(defaults).map((k) => [k, str(src[k], defaults[k])])
+    Object.keys(defaults).map((k) => [k, pick(src, k, defaults[k], `${name}.${k}`)])
   );
 };
 
-/** Приводит сохранённый объект к полной модели, подставляя значения по умолчанию. */
+/**
+ * Приводит сохранённый объект к полной модели: недостающие поля берутся
+ * из VEHICLE_DEFAULTS, введённые пользователем значения не трогаются.
+ */
 export function migrateVehicle(raw) {
   const v = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
   const d = VEHICLE_DEFAULTS;
   return {
-    name: str(v.name, d.name),
-    modelFull: str(v.modelFull, d.modelFull),
-    year: str(v.year, d.year),
-    fuelType: str(v.fuelType, d.fuelType),
-    engine: str(v.engine, d.engine),
-    engineCode: str(v.engineCode, d.engineCode),
-    body: str(v.body, d.body),
-    vin: str(v.vin, d.vin),
-    plate: str(v.plate, d.plate),
-    color: str(v.color, d.color),
-    oil: group(v.oil, d.oil),
-    transmission: group(v.transmission, d.transmission),
-    coolant: group(v.coolant, d.coolant),
-    tires: group(v.tires, d.tires),
-    parts: group(v.parts, d.parts),
-    docs: group(v.docs, d.docs),
-    notes: str(v.notes, d.notes),
+    name: pick(v, "name", d.name),
+    modelFull: pick(v, "modelFull", d.modelFull),
+    version: pick(v, "version", d.version),
+    year: pick(v, "year", d.year),
+    fuelType: pick(v, "fuelType", d.fuelType),
+    driveType: pick(v, "driveType", d.driveType),
+    engine: pick(v, "engine", d.engine),
+    engineCode: pick(v, "engineCode", d.engineCode),
+    power: pick(v, "power", d.power),
+    body: pick(v, "body", d.body),
+    vin: pick(v, "vin", d.vin),
+    plate: pick(v, "plate", d.plate),
+    color: pick(v, "color", d.color),
+    oil: group(v.oil, "oil", d.oil),
+    transmission: group(v.transmission, "transmission", d.transmission),
+    coolant: group(v.coolant, "coolant", d.coolant),
+    tires: group(v.tires, "tires", d.tires),
+    parts: group(v.parts, "parts", d.parts),
+    docs: group(v.docs, "docs", d.docs),
+    notes: pick(v, "notes", d.notes),
   };
 }
 
@@ -96,9 +128,12 @@ export function validateVehicle(v) {
   if (vin && !/^[A-HJ-NPR-Z0-9]{17}$/i.test(vin)) {
     errors.vin = "VIN — 17 символов без букв I, O и Q";
   }
-  const date = v.docs.purchaseDate.trim();
-  if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+  const isoDate = /^\d{4}-\d{2}-\d{2}$/;
+  if (v.docs.purchaseDate.trim() && !isoDate.test(v.docs.purchaseDate.trim())) {
     errors.purchaseDate = "Дата в формате ГГГГ-ММ-ДД";
+  }
+  if (v.docs.firstRegistration.trim() && !isoDate.test(v.docs.firstRegistration.trim())) {
+    errors.firstRegistration = "Дата в формате ГГГГ-ММ-ДД";
   }
   return errors;
 }

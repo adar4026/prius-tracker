@@ -1286,17 +1286,25 @@ html[data-theme="light"] .settings-card {
 
 .spec-list { margin: 0; }
 .spec--vehicle { padding: 9px 0; font-size: 14px; }
-.spec--vehicle dt { max-width: 44%; }
+.spec--vehicle dt { flex: 0 1 auto; max-width: 50%; }
 .spec--vehicle dd {
   display: flex;
+  flex-wrap: wrap; /* ссылка-действие уходит под значение, если не помещается рядом */
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
+  gap: 2px 6px;
   min-width: 0;
   font-weight: 500;
 }
-.spec__value { min-width: 0; overflow-wrap: anywhere; }
-.mono { font-variant-numeric: tabular-nums; letter-spacing: 0.3px; }
+.spec__value { min-width: 0; overflow-wrap: break-word; }
+/* технические коды (VIN, номера деталей, версия) — моноширинным начертанием */
+.mono {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.93em;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.2px;
+}
+.field input.mono { font-size: 14px; }
 
 /* кнопка копирования рядом со значением */
 .copy-btn {

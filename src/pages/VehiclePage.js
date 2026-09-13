@@ -62,6 +62,9 @@ export default function VehiclePage({
     </button>
   );
 
+  // технические коды (VIN, номера деталей, версия) — моноширинным начертанием
+  const mono = (text) => <span className="mono">{text}</span>;
+
   const serviceLink = (entry, label = "Открыть в ТО") => (
     <button type="button" className="link-btn" onClick={() => onOpenService(entry)}>
       {label}
@@ -88,6 +91,9 @@ export default function VehiclePage({
     next.vin = next.vin.trim().toUpperCase();
     next.plate = next.plate.trim();
     next.year = next.year.trim();
+    next.version = next.version.trim().toUpperCase();
+    next.parts.inverter = next.parts.inverter.trim().toUpperCase();
+    next.parts.battery12v = next.parts.battery12v.trim().toUpperCase();
     setVehicle(next);
     setForm(null);
     showToast("Сохранено");
@@ -108,6 +114,7 @@ export default function VehiclePage({
         <input
           id={opts.id}
           type="text"
+          className={opts.mono ? "mono" : undefined}
           value={value}
           onChange={onChange}
           placeholder={opts.placeholder}
@@ -135,27 +142,45 @@ export default function VehiclePage({
           <div className="section-title">Автомобиль</div>
           <div className="card card--form">
             {field("Название", form.name, set("name"), { id: "v-name", error: errors.name })}
-            {field("Полное название модели", form.modelFull, set("modelFull"), { id: "v-model" })}
+            {field("Полное наименование", form.modelFull, set("modelFull"), { id: "v-model" })}
+            {field("Версия", form.version, set("version"), { id: "v-version", mono: true, autoCapitalize: "characters" })}
             <div className="form-row">
               {field("Год выпуска", form.year, set("year"), { id: "v-year", inputMode: "numeric", error: errors.year })}
-              {field("Тип топлива", form.fuelType, set("fuelType"), { id: "v-fuel" })}
+              <div className="field">
+                <label htmlFor="v-first-reg">Первая регистрация</label>
+                <DateField
+                  id="v-first-reg"
+                  label="Первая регистрация"
+                  value={form.docs.firstRegistration}
+                  onChange={setIn("docs", "firstRegistration")}
+                />
+                {errors.firstRegistration && (
+                  <div className="hint" style={{ color: "var(--red)" }}>{errors.firstRegistration}</div>
+                )}
+              </div>
             </div>
-            {field("Двигатель", form.engine, set("engine"), { id: "v-engine" })}
             <div className="form-row">
-              {field("Код двигателя", form.engineCode, set("engineCode"), { id: "v-engine-code" })}
-              {field("Кузов", form.body, set("body"), { id: "v-body" })}
+              {field("Тип (кратко)", form.fuelType, set("fuelType"), { id: "v-fuel" })}
+              {field("Мощность", form.power, set("power"), { id: "v-power" })}
             </div>
-            {field("VIN", form.vin, set("vin"), { id: "v-vin", autoCapitalize: "characters", error: errors.vin })}
+            {field("Тип (полностью)", form.driveType, set("driveType"), { id: "v-drive" })}
             <div className="form-row">
-              {field("Госномер", form.plate, set("plate"), { id: "v-plate", autoCapitalize: "characters" })}
-              {field("Код цвета", form.color, set("color"), { id: "v-color" })}
+              {field("Двигатель", form.engineCode, set("engineCode"), { id: "v-engine-code", mono: true })}
+              {field("Силовая установка", form.engine, set("engine"), { id: "v-engine" })}
             </div>
+            {field("VIN", form.vin, set("vin"), { id: "v-vin", mono: true, autoCapitalize: "characters", error: errors.vin })}
+            <div className="form-row">
+              {field("Госномер", form.plate, set("plate"), { id: "v-plate", mono: true, autoCapitalize: "characters" })}
+              {field("Кузов", form.body, set("body"), { id: "v-body", mono: true })}
+            </div>
+            {field("Цвет кузова (код)", form.color, set("color"), { id: "v-color", mono: true })}
           </div>
 
           <div className="section-title">Моторное масло</div>
           <div className="card card--form">
+            {field("Рекомендованное масло", form.oil.grade, setIn("oil", "grade"), { id: "v-oil-grade" })}
             <div className="form-row">
-              {field("Масло", form.oil.grade, setIn("oil", "grade"), { id: "v-oil-grade" })}
+              {field("Объём без фильтра", form.oil.volumeNoFilter, setIn("oil", "volumeNoFilter"), { id: "v-oil-vol0" })}
               {field("Объём с фильтром", form.oil.volume, setIn("oil", "volume"), { id: "v-oil-vol" })}
             </div>
             {field("Масляный фильтр", form.oil.filter, setIn("oil", "filter"), { id: "v-oil-filter" })}
@@ -164,8 +189,8 @@ export default function VehiclePage({
           <div className="section-title">Трансмиссия</div>
           <div className="card card--form">
             <div className="form-row">
-              {field("Жидкость", form.transmission.fluid, setIn("transmission", "fluid"), { id: "v-cvt-fluid" })}
-              {field("Объём", form.transmission.volume, setIn("transmission", "volume"), { id: "v-cvt-vol" })}
+              {field("Масло", form.transmission.fluid, setIn("transmission", "fluid"), { id: "v-cvt-fluid" })}
+              {field("Объём (частичная замена)", form.transmission.volume, setIn("transmission", "volume"), { id: "v-cvt-vol" })}
             </div>
           </div>
 
@@ -178,15 +203,20 @@ export default function VehiclePage({
           <div className="section-title">Колёса и шины</div>
           <div className="card card--form">
             <div className="form-row">
-              {field("Штатный размер", form.tires.stock, setIn("tires", "stock"), { id: "v-tire-stock" })}
-              {field("Текущий размер", form.tires.current, setIn("tires", "current"), { id: "v-tire-cur" })}
+              {field("Сверловка", form.tires.pcd, setIn("tires", "pcd"), { id: "v-tire-pcd" })}
+              {field("Штатные диски", form.tires.rims, setIn("tires", "rims"), { id: "v-tire-rims" })}
             </div>
-            {field("PCD", form.tires.pcd, setIn("tires", "pcd"), { id: "v-tire-pcd" })}
+            <div className="form-row">
+              {field("Штатные шины", form.tires.stock, setIn("tires", "stock"), { id: "v-tire-stock" })}
+              {field("Текущие шины", form.tires.current, setIn("tires", "current"), { id: "v-tire-cur" })}
+            </div>
+            {field("Запасное колесо", form.tires.spare, setIn("tires", "spare"), { id: "v-tire-spare" })}
           </div>
 
           <div className="section-title">Номера деталей</div>
           <div className="card card--form">
-            {field("Инвертор", form.parts.inverter, setIn("parts", "inverter"), { id: "v-part-inv" })}
+            {field("Инвертор", form.parts.inverter, setIn("parts", "inverter"), { id: "v-part-inv", mono: true, autoCapitalize: "characters" })}
+            {field("Аккумулятор 12 V", form.parts.battery12v, setIn("parts", "battery12v"), { id: "v-part-bat", mono: true, autoCapitalize: "characters" })}
           </div>
 
           <div className="section-title">Документы и заметки</div>
@@ -222,7 +252,8 @@ export default function VehiclePage({
     ? "var(--muted)"
     : derived.oilLeft.overdue ? "var(--red)" : "var(--green)";
 
-  const hasDocs = derived.itvLast || derived.itvNext || derived.insurance || vehicle.docs.purchaseDate;
+  const hasDocs = derived.itvLast || derived.itvNext || derived.insurance
+    || vehicle.docs.firstRegistration || vehicle.docs.purchaseDate;
 
   return (
     <>
@@ -253,24 +284,33 @@ export default function VehiclePage({
           >
             <dl className="spec-list">
               <SpecRow label="Модель" value={vehicle.modelFull} />
+              {vehicle.version && <SpecRow label="Версия" value={mono(vehicle.version)} />}
               <SpecRow label="Год выпуска" value={vehicle.year} />
-              <SpecRow label="Двигатель" value={`${vehicle.fuelType.toLowerCase()}, ${vehicle.engine}`} />
-              <SpecRow label="Код двигателя" value={vehicle.engineCode} />
-              <SpecRow label="Кузов" value={vehicle.body} />
-              <SpecRow label="VIN" value={<span className="mono">{vehicle.vin}</span>} action={copyBtn(vehicle.vin, "VIN")} />
-              <SpecRow label="Госномер" value={<span className="mono">{vehicle.plate}</span>} action={copyBtn(vehicle.plate, "Госномер")} />
-              {vehicle.color && <SpecRow label="Код цвета" value={vehicle.color} />}
+              {vehicle.docs.firstRegistration && (
+                <SpecRow label="Первая регистрация" value={fmtDate(vehicle.docs.firstRegistration)} />
+              )}
+              <SpecRow label="Двигатель" value={mono(vehicle.engineCode)} />
+              {vehicle.engine && <SpecRow label="Силовая установка" value={vehicle.engine} />}
+              <SpecRow label="Тип" value={vehicle.driveType || vehicle.fuelType} />
+              {vehicle.power && <SpecRow label="Мощность" value={vehicle.power} />}
+              <SpecRow label="Кузов" value={mono(vehicle.body)} />
+              <SpecRow label="VIN" value={mono(vehicle.vin)} action={copyBtn(vehicle.vin, "VIN")} />
+              <SpecRow label="Госномер" value={mono(vehicle.plate)} action={copyBtn(vehicle.plate, "Госномер")} />
+              {vehicle.color && <SpecRow label="Цвет кузова" value={mono(vehicle.color)} />}
               {vehicle.notes && <SpecRow label="Заметки" value={vehicle.notes} />}
             </dl>
           </VehicleSection>
 
           <VehicleSection
             icon="🛢️" title="Моторное масло"
-            summary={`${vehicle.oil.grade} · ${vehicle.oil.volume}`}
+            summary={`${vehicle.oil.grade} · ${vehicle.oil.volume} с фильтром`}
             open={!!open.oil} onToggle={() => toggle("oil")}
           >
             <dl className="spec-list">
-              <SpecRow label="Рекомендованное масло" value={vehicle.oil.grade} />
+              <SpecRow label="Масло" value={vehicle.oil.grade} />
+              {vehicle.oil.volumeNoFilter && (
+                <SpecRow label="Объём без фильтра" value={vehicle.oil.volumeNoFilter} />
+              )}
               <SpecRow label="Объём с фильтром" value={vehicle.oil.volume} />
               <SpecRow label="Масляный фильтр" value={vehicle.oil.filter} />
               {derived.oil && <SpecRow label="Последняя замена" value={when(derived.oil)} />}
@@ -289,8 +329,8 @@ export default function VehiclePage({
             open={!!open.cvt} onToggle={() => toggle("cvt")}
           >
             <dl className="spec-list">
-              <SpecRow label="Трансмиссионная жидкость" value={vehicle.transmission.fluid} />
-              <SpecRow label="Ориентировочный объём" value={vehicle.transmission.volume} />
+              <SpecRow label="Масло" value={vehicle.transmission.fluid} />
+              <SpecRow label="Частичная замена" value={vehicle.transmission.volume} />
               {derived.cvt && (
                 <SpecRow label="Последняя замена" value={when(derived.cvt)} action={serviceLink(derived.cvt)} />
               )}
@@ -319,9 +359,11 @@ export default function VehiclePage({
             open={!!open.tires} onToggle={() => toggle("tires")}
           >
             <dl className="spec-list">
-              <SpecRow label="Штатный размер" value={vehicle.tires.stock} />
-              <SpecRow label="Текущий размер" value={vehicle.tires.current} />
-              <SpecRow label="PCD" value={vehicle.tires.pcd} />
+              <SpecRow label="Сверловка" value={vehicle.tires.pcd} />
+              {vehicle.tires.rims && <SpecRow label="Штатные диски" value={vehicle.tires.rims} />}
+              <SpecRow label="Штатные шины" value={vehicle.tires.stock} />
+              <SpecRow label="Текущие шины" value={vehicle.tires.current} />
+              {vehicle.tires.spare && <SpecRow label="Запасное колесо" value={vehicle.tires.spare} />}
               {derived.tires && (
                 <SpecRow label="Последняя замена" value={when(derived.tires)} action={serviceLink(derived.tires)} />
               )}
@@ -335,7 +377,10 @@ export default function VehiclePage({
             open={!!open.parts} onToggle={() => toggle("parts")}
           >
             <dl className="spec-list">
-              <SpecRow label="Инвертор" value={<span className="mono">{vehicle.parts.inverter}</span>} action={copyBtn(vehicle.parts.inverter, "Номер инвертора")} />
+              <SpecRow label="Инвертор" value={mono(vehicle.parts.inverter)} action={copyBtn(vehicle.parts.inverter, "Номер инвертора")} />
+              {vehicle.parts.battery12v && (
+                <SpecRow label="Аккумулятор 12 V" value={mono(vehicle.parts.battery12v)} />
+              )}
             </dl>
           </VehicleSection>
 
@@ -370,6 +415,9 @@ export default function VehiclePage({
                   );
                 })()}
                 {derived.insurance?.note && <SpecRow label="Заметка" value={derived.insurance.note} />}
+                {vehicle.docs.firstRegistration && (
+                  <SpecRow label="Первая регистрация" value={fmtDate(vehicle.docs.firstRegistration)} />
+                )}
                 {vehicle.docs.purchaseDate && (
                   <SpecRow label="Дата покупки" value={fmtDate(vehicle.docs.purchaseDate)} />
                 )}
