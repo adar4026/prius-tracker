@@ -93,33 +93,3 @@ export const CATEGORY_ICONS = {
 };
 
 export const REMINDER_ICONS = ["🔧","💧","🛑","🚗","❄️","📋","🛡️","⚙️","🔋","🛞","🪫","📌"];
-
-export const CAR = {
-  model: "Toyota Prius+ 1.8 HSD",
-  year: "2012",
-  engine: "2ZR-FXE Hybrid 136 CV",
-  vin: "JTDZS3EU003044352",
-  color: "1G3",
-  specs: [
-    {
-      title: "Моторное масло",
-      rows: [["Тип", "Toyota 0W-20"], ["Объём с фильтром", "4.2 л"]],
-    },
-    {
-      title: "Трансмиссия",
-      rows: [["Тип", "Toyota ATF WS"], ["Объём", "3.4 л"]],
-    },
-    {
-      title: "Антифриз",
-      rows: [
-        ["Тип", "Toyota Super Long Life Coolant (SLLC), розовый"],
-        ["Двигатель", "примерно 7.2 л"],
-        ["Инвертор", "примерно 2.1 л"],
-      ],
-    },
-    {
-      title: "Шины",
-      rows: [["Размер", "215/50 R17"]],
-    },
-  ],
-};

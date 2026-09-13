@@ -1,32 +1,30 @@
 import React from "react";
-import { THEME_META } from "../themes";
+import { BackIcon, MenuIcon } from "./Icons";
 
-export default function Header({ title, subtitle, theme, onToggleTheme, onOpenSettings }) {
-  const meta = THEME_META[theme];
+/**
+ * Верхняя панель. На основных вкладках: [☰] Lexcar.
+ * На внутренних страницах: [←] Заголовок и, при необходимости, действие справа.
+ */
+export default function Header({ title, onMenu, onBack, action }) {
   return (
     <header className="header">
-      <div className="header__title">
-        <h1>{title}</h1>
-        {subtitle && <span className="header__sub">{subtitle}</span>}
-      </div>
-      <div className="header__actions">
-        <button
-          className="theme-btn"
-          onClick={onOpenSettings}
-          title="Настройки и данные"
-          aria-label="Настройки и данные"
-        >
-          ⚙️
+      {onBack ? (
+        <button type="button" className="header__btn" onClick={onBack} aria-label="Назад">
+          <BackIcon />
         </button>
+      ) : (
         <button
-          className="theme-btn"
-          onClick={onToggleTheme}
-          title={`Тема: ${meta.label}`}
-          aria-label={`Тема: ${meta.label}. Переключить`}
+          type="button"
+          className="header__btn"
+          onClick={onMenu}
+          aria-label="Открыть меню"
+          aria-haspopup="dialog"
         >
-          {meta.icon}
+          <MenuIcon />
         </button>
-      </div>
+      )}
+      <h1 className="header__title">{title}</h1>
+      {action && <div className="header__action">{action}</div>}
     </header>
   );
 }

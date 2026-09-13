@@ -1,21 +1,12 @@
-import React, { useState } from "react";
+import React from "react";
 import Stat from "../components/Stat";
-import CarModal from "../components/CarModal";
-import { CAR } from "../data";
+import { lastOilChange } from "../vehicle";
 import {
   avg, byDateDesc, consumptionPoints, fmtDate, fmtKm, fmtMoney, fmtNum,
   kmLeftLabel, nearestDueLabel, num, reminderStatus, reminderUrgency,
 } from "../utils";
 
-function lastOilChange(service) {
-  return service
-    .filter((s) => s.category === "oil" && s.km > 0)
-    .sort((a, b) => b.km - a.km)[0];
-}
-
-export default function HomeTab({ fuel, service, reminders, currentKm, onGo }) {
-  const [carOpen, setCarOpen] = useState(false);
-
+export default function HomeTab({ fuel, service, reminders, currentKm, vehicle, onGo, onOpenVehicle }) {
   const points = consumptionPoints(fuel);
   const avgConsumption = avg(points.map((p) => p.consumption));
   const avgPrice = avg(fuel.map((f) => num(f.pricePerL)).filter((p) => p > 0));
@@ -146,16 +137,14 @@ export default function HomeTab({ fuel, service, reminders, currentKm, onGo }) {
       )}
 
       <div className="section-title">Автомобиль</div>
-      <button type="button" className="card car-card" onClick={() => setCarOpen(true)}>
+      <button type="button" className="card car-card" onClick={onOpenVehicle}>
         <span className="car-card__icon">🚗</span>
         <span className="car-card__main">
-          <span className="row__title">{CAR.model}</span>
-          <span className="row__sub">{CAR.year}</span>
+          <span className="row__title">{vehicle.name}</span>
+          <span className="row__sub">{vehicle.year} · {vehicle.fuelType}</span>
         </span>
         <span className="car-card__chevron">›</span>
       </button>
-
-      {carOpen && <CarModal onClose={() => setCarOpen(false)} />}
     </main>
   );
 }

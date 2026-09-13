@@ -95,51 +95,64 @@ button, input, select, textarea {
   z-index: 20;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: calc(env(safe-area-inset-top, 0px) + 14px) 16px 12px;
+  gap: 6px;
+  min-height: 56px;
+  padding: calc(env(safe-area-inset-top, 0px) + 6px) 10px 6px;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
 }
 
 .header__title {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
+  flex: 1;
   min-width: 0;
-}
-
-.header__title h1 {
   margin: 0;
   font-size: 19px;
   font-weight: 700;
   letter-spacing: 0.2px;
-}
-
-.header__sub {
-  font-size: 11px;
-  color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.theme-btn {
+/* круглая кнопка шапки (бургер, назад, закрыть): зона нажатия 44 px */
+.header__btn {
   flex: none;
-  width: 38px;
-  height: 38px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
   border-radius: 50%;
-  border: 1px solid var(--border);
-  background: var(--card);
-  font-size: 17px;
-  line-height: 1;
+  background: transparent;
+  color: var(--text);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.15s ease;
+  transition: background 0.15s ease, transform 0.15s ease;
 }
-.theme-btn:active { transform: scale(0.92); }
+.header__btn:active { background: var(--soft); transform: scale(0.94); }
+
+.header__action { flex: none; margin-left: auto; }
+
+/* текстовое действие справа («Редактировать», «Сохранить») */
+.header__text-btn {
+  min-height: 44px;
+  padding: 0 8px;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.header__text-btn:active { opacity: 0.6; }
+
+/* на самых узких экранах (320 px) заголовок и действие справа умещаются рядом */
+@media (max-width: 340px) {
+  .header__title { font-size: 17px; }
+  .header__text-btn { padding: 0 4px; font-size: 14px; }
+}
 
 .screen { padding: 14px 16px 8px; }
 
@@ -766,15 +779,6 @@ html[data-theme="light"] .filter-btn--active {
 .chart-legend span { display: flex; align-items: center; gap: 5px; }
 .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
 
-/* ---------- шапка: несколько кнопок ---------- */
-
-.header__actions {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 /* ---------- действия над записью ---------- */
 
 .row__actions {
@@ -876,11 +880,6 @@ html[data-theme="light"] .filter-btn--active {
 .car-card__icon { font-size: 22px; line-height: 1; flex: none; }
 .car-card__main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .car-card__chevron { flex: none; color: var(--muted); font-size: 22px; line-height: 1; }
-
-/* ---------- вложенные карточки в модалке ---------- */
-
-.modal .card + .btn,
-.modal .btn + .section-title { margin-top: 14px; }
 
 .row__countdown { font-weight: 600; margin-top: 4px; }
 
@@ -1016,3 +1015,412 @@ html[data-theme="light"] .item--card.item--overdue {
 .fab:active { transform: scale(0.94); }
 /* экран с плавающей кнопкой: чтобы она не закрывала последнюю карточку */
 .screen--fab { padding-bottom: 84px; }
+
+/* ---------- боковая шторка ---------- */
+
+.drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  visibility: hidden;
+  transition: visibility 0s linear 0.24s;
+}
+.drawer--open {
+  visibility: visible;
+  transition-delay: 0s;
+}
+.drawer__overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 25, 35, 0.5);
+  opacity: 0;
+  transition: opacity 0.24s ease;
+}
+.drawer--open .drawer__overlay { opacity: 1; }
+.drawer__panel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(84vw, 360px);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border-right: 1px solid var(--border);
+  box-shadow: 8px 0 32px rgba(10, 25, 35, 0.18);
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  transform: translateX(-100%);
+  transition: transform 0.24s cubic-bezier(0.32, 0.72, 0, 1);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.drawer--open .drawer__panel { transform: translateX(0); }
+
+.drawer__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 56px;
+  padding: 6px 6px 6px 18px;
+}
+.drawer__brand {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+/* карточка автомобиля в шапке шторки */
+.drawer__car {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 2px 10px 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: background 0.15s ease;
+}
+.drawer__car:active { background: var(--soft); }
+.drawer__car--active { border-color: var(--accent); }
+.drawer__car-icon {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--accent-soft);
+  font-size: 26px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.drawer__car-main { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.drawer__car-name {
+  font-weight: 700;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.drawer__car-sub { font-size: 12px; color: var(--muted); }
+.drawer__car-km {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.drawer__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 10px;
+}
+.drawer__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.drawer__item:active { background: var(--soft); }
+.drawer__item--active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+.drawer__item-icon {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--soft);
+  font-size: 18px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.drawer__item--active .drawer__item-icon { background: var(--accent); }
+.drawer__item-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* нижний блок: настройки и версия, прижаты к низу */
+.drawer__foot {
+  margin-top: auto;
+  padding: 8px 10px 10px;
+  border-top: 1px solid var(--border);
+}
+.drawer__version {
+  padding: 8px 10px 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ---------- внутренние страницы ---------- */
+
+.page { padding-top: 12px; }
+
+/* карточка автомобиля на странице «Автомобиль» */
+.vehicle-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 22px 14px 18px;
+}
+.vehicle-hero__icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 22px;
+  background: var(--accent-soft);
+  font-size: 38px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+.vehicle-hero__name { font-size: 20px; font-weight: 700; letter-spacing: -0.2px; }
+.vehicle-hero__sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.vehicle-hero__km {
+  margin-top: 10px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--soft);
+  font-size: 13px;
+  color: var(--muted);
+}
+.vehicle-hero__km b { color: var(--accent); font-variant-numeric: tabular-nums; }
+html[data-theme="light"] .vehicle-hero,
+html[data-theme="light"] .vsec,
+html[data-theme="light"] .settings-card {
+  background: #ffffff;
+  border-color: #d4e2e8;
+  box-shadow: 0 4px 14px rgba(32, 74, 91, 0.10);
+}
+
+/* раскрывающиеся секции */
+.vsec-list { margin-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+.vsec {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.vsec__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.vsec__head:active { background: var(--soft); }
+.vsec__icon {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: var(--soft);
+  font-size: 18px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.vsec--open .vsec__icon { background: var(--accent-soft); }
+.vsec__main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.vsec__title { font-weight: 600; font-size: 15px; }
+.vsec__summary {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vsec__chevron {
+  flex: none;
+  color: var(--muted);
+  display: flex;
+  transition: transform 0.2s ease;
+}
+.vsec--open .vsec__chevron { transform: rotate(90deg); }
+.vsec__body {
+  padding: 0 14px 14px;
+  border-top: 1px solid var(--border);
+  animation: fade-in 0.18s ease;
+}
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+.vsec__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-top: 6px;
+}
+
+.spec-list { margin: 0; }
+.spec--vehicle { padding: 9px 0; font-size: 14px; }
+.spec--vehicle dt { max-width: 44%; }
+.spec--vehicle dd {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+  font-weight: 500;
+}
+.spec__value { min-width: 0; overflow-wrap: anywhere; }
+.mono { font-variant-numeric: tabular-nums; letter-spacing: 0.3px; }
+
+/* кнопка копирования рядом со значением */
+.copy-btn {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  margin: -6px -8px -6px 0;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.copy-btn:active { background: var(--accent-soft); }
+
+/* текстовая ссылка-кнопка внутри секции */
+.link-btn {
+  flex: none;
+  min-height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.link-btn:active { opacity: 0.6; }
+
+.btn--section { margin-top: 10px; }
+
+/* карточка с полями формы: последнее поле без нижнего отступа */
+.card--form .field:last-child { margin-bottom: 0; }
+.card--form .form-row:last-child .field { margin-bottom: 0; }
+
+/* ---------- всплывающее подтверждение ---------- */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 20px);
+  z-index: 70;
+  max-width: calc(100% - 32px);
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 6px 18px rgba(10, 25, 35, 0.22);
+  transform: translate(-50%, 12px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.toast--visible { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---------- экран «Данные и настройки» ---------- */
+
+.settings-card { padding: 14px; }
+.settings-row { display: flex; align-items: center; gap: 12px; }
+.settings-row__main { flex: 1; min-width: 0; }
+.settings-row + .seg, .settings-row + .btn { margin-top: 12px; }
+
+.seg--flat { margin-bottom: 0; background: var(--soft); }
+.seg--flat button { padding: 9px 4px; min-height: 40px; }
+
+.settings-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.settings-stats > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 4px;
+  border-radius: 12px;
+  background: var(--soft);
+  text-align: center;
+}
+.settings-stats b { font-size: 18px; font-variant-numeric: tabular-nums; }
+.settings-stats span { font-size: 11px; color: var(--muted); }
+.settings-stats--compact { margin: 10px 0 8px; }
+
+.settings-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+
+/* блок предупреждения перед необратимым действием */
+.notice {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--gold);
+  background: var(--accent-soft);
+}
+.notice--danger {
+  border-color: var(--red);
+  background: rgba(217, 79, 79, 0.08);
+}
+.notice__error {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--red);
+}
+.notice .form-actions { margin-top: 12px; }
+
+.btn--danger {
+  border: 1px solid var(--red);
+  color: var(--red);
+}
+.btn--danger-solid {
+  background: var(--red);
+  color: #fff;
+}
+
+.about { display: flex; align-items: center; gap: 12px; }
+.about__icon { flex: none; width: 48px; height: 48px; border-radius: 12px; }

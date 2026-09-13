@@ -6,6 +6,7 @@ export const KEYS = {
   reminders: "autocontrol_reminders",
   theme: "autocontrol_theme",
   imports: "autocontrol_imports",
+  vehicle: "autocontrol_vehicle",
 };
 
 function read(key, fallback) {
