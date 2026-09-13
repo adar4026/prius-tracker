@@ -41,7 +41,7 @@ export default function HomeTab({ fuel, service, reminders, currentKm, onGo }) {
   const lastFill = recent[0];
 
   return (
-    <main className="screen">
+    <main className="screen screen--home">
       <div className="card hero">
         <div className="hero__label">Текущий пробег</div>
         <div className="hero__value">
@@ -92,7 +92,7 @@ export default function HomeTab({ fuel, service, reminders, currentKm, onGo }) {
             return (
               <div
                 key={t.id}
-                className={`item reminder ${isOverdue ? "item--overdue" : ""}`}
+                className={`item item--card reminder ${isOverdue ? "item--overdue" : ""}`}
                 onClick={() => onGo("reminders")}
               >
                 <span className="reminder__icon">{t.icon}</span>
@@ -124,7 +124,7 @@ export default function HomeTab({ fuel, service, reminders, currentKm, onGo }) {
         <>
           <div className="section-title">Последние заправки</div>
           {recent.map((f) => (
-            <div key={f.id} className="item" onClick={() => onGo("fuel")}>
+            <div key={f.id} className="item item--card" onClick={() => onGo("fuel")}>
               <div className="row">
                 <div className="row__main">
                   <div className="row__title">{fmtDate(f.date)}</div>

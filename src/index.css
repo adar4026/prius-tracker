@@ -784,6 +784,12 @@ html[data-theme="light"] .item--card {
   border-color: #d4e2e8;
   box-shadow: 0 4px 14px rgba(32, 74, 91, 0.10);
 }
+/* на главной все карточки (пробег, статистика, масло, автомобиль) тоже белые */
+html[data-theme="light"] .screen--home .card {
+  background: #ffffff;
+  border-color: #d4e2e8;
+  box-shadow: 0 4px 14px rgba(32, 74, 91, 0.10);
+}
 /* просроченная задача сохраняет красную подсветку поверх белого */
 html[data-theme="light"] .item--card.item--overdue {
   background: rgba(217, 79, 79, 0.08);
