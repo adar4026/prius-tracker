@@ -773,15 +773,21 @@ button, input, select, textarea {
 
 /* ---------- карточка заправки ---------- */
 
-.fuel-card {
-  padding: 16px;
-  margin-bottom: 14px;
-}
-/* в голубой теме карточки заправок чисто белые, с нежной рамкой и воздушной тенью */
-html[data-theme="light"] .fuel-card {
+.fuel-card { padding: 16px; }
+
+/* ---------- «объёмные» карточки журналов: заправки, ТО, задачи ---------- */
+
+.item--card { margin-bottom: 14px; }
+/* в голубой теме — чисто белые, с нежной рамкой и воздушной тенью */
+html[data-theme="light"] .item--card {
   background: #ffffff;
   border-color: #d4e2e8;
   box-shadow: 0 4px 14px rgba(32, 74, 91, 0.10);
+}
+/* просроченная задача сохраняет красную подсветку поверх белого */
+html[data-theme="light"] .item--card.item--overdue {
+  background: rgba(217, 79, 79, 0.08);
+  border-color: rgba(217, 79, 79, 0.45);
 }
 .fuel-card__head {
   display: flex;

@@ -179,7 +179,7 @@ export default function RemindersTab({
         return (
           <div
             key={r.id}
-            className={`item reminder ${r.status === "overdue" ? "item--overdue" : ""} ${r.completed ? "item--done" : ""}`}
+            className={`item item--card reminder ${r.status === "overdue" ? "item--overdue" : ""} ${r.completed ? "item--done" : ""}`}
           >
             <span className="reminder__icon">{r.icon}</span>
             <div className="row__main">

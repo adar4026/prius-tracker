@@ -326,7 +326,7 @@ export default function ServiceTab({
       )}
 
       {visible.map((s) => (
-        <div key={s.id} className="item item--striped">
+        <div key={s.id} className="item item--card item--striped">
           <span className="item__stripe" style={{ background: CATEGORY_COLORS[s.category] || "var(--border)" }} />
           <div className="row">
             <div className="row__main">

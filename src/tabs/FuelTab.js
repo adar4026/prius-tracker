@@ -239,7 +239,7 @@ export default function FuelTab({ fuel, setFuel, year, onYear }) {
         const prevKm = prevKmById.get(f.id);
         const distance = prevKm !== undefined ? f.km - prevKm : null;
         return (
-          <div key={f.id} className="item fuel-card">
+          <div key={f.id} className="item item--card fuel-card">
             <div className="fuel-card__head">
               <span className="fuel-card__icon" aria-hidden="true">⛽</span>
               <span className="fuel-card__title">
