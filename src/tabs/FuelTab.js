@@ -54,6 +54,13 @@ export default function FuelTab({ fuel, setFuel, year, onYear }) {
     [fuel]
   );
 
+  const prevKmById = useMemo(() => {
+    const map = new Map();
+    const byKm = [...fuel].sort(byKmAsc);
+    byKm.forEach((f, i) => { if (i > 0) map.set(f.id, byKm[i - 1].km); });
+    return map;
+  }, [fuel]);
+
   const years = useMemo(() => yearsOf(fuel), [fuel]);
   const counts = useMemo(() => {
     const map = {};
@@ -192,9 +199,7 @@ export default function FuelTab({ fuel, setFuel, year, onYear }) {
   };
 
   return (
-    <main className="screen">
-      <button className="btn" onClick={openAdd}>+ Добавить заправку</button>
-
+    <main className="screen screen--fab">
       <JournalFilter
         years={years}
         counts={counts}
@@ -230,44 +235,68 @@ export default function FuelTab({ fuel, setFuel, year, onYear }) {
         </div>
       )}
 
-      {visible.map((f) => (
-        <div key={f.id} className="item">
-          <div className="row">
-            <div className="row__main">
-              <div className="row__title">
-                {fmtDate(f.date)}{" "}
+      {visible.map((f) => {
+        const prevKm = prevKmById.get(f.id);
+        const distance = prevKm !== undefined ? f.km - prevKm : null;
+        return (
+          <div key={f.id} className="item fuel-card">
+            <div className="fuel-card__head">
+              <span className="fuel-card__icon" aria-hidden="true">⛽</span>
+              <span className="fuel-card__title">
+                <span className="fuel-card__kind">Заправка</span>
                 {!isFull(f) && (
                   <span className="badge" style={{ color: "var(--gold)" }}>не до полного</span>
                 )}
-              </div>
-              <div className="row__sub">
-                {fmtKm(f.km)} км • {fmtNum(f.liters, 2)} л • {fmtNum(f.pricePerL, 3)} €/л
-              </div>
-              {f.discount > 0 && (
-                <div className="row__sub">
-                  <s>{fmtMoney(f.grossTotal)}</s>{" "}
-                  <span style={{ color: "var(--green)" }}>скидка −{fmtMoney(f.discount)}</span>
-                </div>
-              )}
-              {f.station && <div className="row__sub">📍 {f.station}</div>}
-              {f.note && <div className="row__sub">📝 {f.note}</div>}
+              </span>
+              <span className="fuel-card__date">{fmtDate(f.date)}</span>
             </div>
-            <div className="row__right">
-              <div className="row__value">{fmtMoney(f.paidTotal)}</div>
-              <div
-                className="row__sub"
-                style={{ color: f.consumption ? "var(--green)" : "var(--muted)" }}
-              >
-                {f.consumption ? `${fmtNum(f.consumption, 2)} л/100 км` : "—"}
+
+            <div className="fuel-card__main">
+              <div>
+                <div className="fuel-card__label">Пробег</div>
+                <div className="fuel-card__big">{fmtKm(f.km)} <small>км</small></div>
               </div>
-              <div className="row__actions">
-                <button className="icon-btn" onClick={() => openEdit(f)} aria-label="Изменить">✏️</button>
-                <button className="icon-btn" onClick={() => remove(f)} aria-label="Удалить">🗑</button>
+              <div className="fuel-card__right">
+                <div className="fuel-card__label">Сумма</div>
+                <div className="fuel-card__big fuel-card__big--sum">{fmtMoney(f.paidTotal)}</div>
               </div>
+            </div>
+
+            <div className="fuel-card__row">
+              <span>
+                Расход{" "}
+                <b style={{ color: f.consumption ? "var(--green)" : "var(--muted)" }}>
+                  {f.consumption ? `${fmtNum(f.consumption, 2)} л/100 км` : "—"}
+                </b>
+              </span>
+              <span className="fuel-card__right">Литры <b>{fmtNum(f.liters, 2)} л</b></span>
+            </div>
+
+            <div className="fuel-card__row fuel-card__row--foot">
+              <span>Пройдено <b>{distance !== null ? `${fmtKm(distance)} км` : "—"}</b></span>
+              <span className="fuel-card__right">Цена <b>{fmtNum(f.pricePerL, 3)} €/л</b></span>
+            </div>
+
+            {f.discount > 0 && (
+              <div className="fuel-card__note">
+                <s>{fmtMoney(f.grossTotal)}</s>{" "}
+                <span style={{ color: "var(--green)" }}>скидка −{fmtMoney(f.discount)}</span>
+              </div>
+            )}
+            {f.station && <div className="fuel-card__note">📍 {f.station}</div>}
+            {f.note && <div className="fuel-card__note">📝 {f.note}</div>}
+
+            <div className="row__actions row__actions--left">
+              <button className="icon-btn" onClick={() => openEdit(f)} aria-label="Изменить">✏️</button>
+              <button className="icon-btn" onClick={() => remove(f)} aria-label="Удалить">🗑</button>
             </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
+
+      <button className="fab" onClick={openAdd} aria-label="Добавить заправку" title="Добавить заправку">
+        +
+      </button>
 
       {open && (
         <Modal

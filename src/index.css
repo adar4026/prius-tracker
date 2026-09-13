@@ -5,23 +5,44 @@
   --text: #e8e0d0;
   --muted: #7a7468;
   --soft: rgba(255, 255, 255, 0.04);
+  --shadow: none;
 
   --gold: #d4af37;
   --green: #4caf8a;
   --red: #ff6b6b;
   --blue: #7b9fd4;
 
-  --radius: 14px;
+  /* акцент интерфейса (активные вкладки, кнопки, фокус) — отдельно от цветов данных */
+  --accent: var(--gold);
+  --accent-contrast: var(--bg);
+  --accent-soft: rgba(212, 175, 55, 0.16);
+  --fuel: #ff9d3f;
+  --fuel-soft: rgba(255, 157, 63, 0.16);
+
+  --radius: 16px;
   --nav-h: 62px;
 }
 
+/* светлая тема — «холодный голубой»: ледяной фон, почти белые карточки, бирюзовый акцент */
 html[data-theme="light"] {
-  --bg: #ffffff;
-  --card: #f5f5f5;
-  --border: #e0e0e0;
-  --text: #1a1a1a;
-  --muted: #6b6b6b;
-  --soft: rgba(0, 0, 0, 0.03);
+  --bg: #eef7fa;
+  --card: #f7fcfd;
+  --border: #dce9ed;
+  --text: #14232b;
+  --muted: #5b7482;
+  --soft: rgba(20, 60, 80, 0.045);
+  --shadow: 0 2px 10px rgba(20, 60, 80, 0.07);
+
+  --gold: #b8901c;
+  --green: #2e9a72;
+  --red: #d94f4f;
+  --blue: #4f7fc2;
+
+  --accent: #0e7c86;
+  --accent-contrast: #ffffff;
+  --accent-soft: #d9eef3;
+  --fuel: #f28c28;
+  --fuel-soft: #ffe9d6;
 }
 
 html[data-theme="sepia"] {
@@ -31,6 +52,9 @@ html[data-theme="sepia"] {
   --text: #3d2b1f;
   --muted: #7a6a55;
   --soft: rgba(61, 43, 31, 0.04);
+  --accent-soft: rgba(212, 175, 55, 0.18);
+  --fuel: #e07a1f;
+  --fuel-soft: rgba(224, 122, 31, 0.14);
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -136,6 +160,7 @@ button, input, select, textarea {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 14px;
+  box-shadow: var(--shadow);
 }
 
 .card + .card { margin-top: 10px; }
@@ -153,7 +178,7 @@ button, input, select, textarea {
 .hero__value {
   font-size: 40px;
   font-weight: 700;
-  color: var(--gold);
+  color: var(--accent);
   letter-spacing: -1px;
   margin: 4px 0 2px;
   font-variant-numeric: tabular-nums;
@@ -251,6 +276,7 @@ button, input, select, textarea {
   margin-bottom: 9px;
   position: relative;
   overflow: hidden;
+  box-shadow: var(--shadow);
 }
 .item--striped { padding-left: 18px; }
 .item__stripe {
@@ -291,9 +317,9 @@ button, input, select, textarea {
   white-space: nowrap;
 }
 .chip--active {
-  color: var(--bg);
-  background: var(--gold);
-  border-color: var(--gold);
+  color: var(--accent-contrast);
+  background: var(--accent);
+  border-color: var(--accent);
   font-weight: 600;
 }
 
@@ -315,7 +341,7 @@ button, input, select, textarea {
   -webkit-appearance: none;
   appearance: none;
 }
-.search input:focus { border-color: var(--gold); }
+.search input:focus { border-color: var(--accent); }
 .search input::-webkit-search-cancel-button,
 .search input::-webkit-search-decoration { -webkit-appearance: none; display: none; }
 .search__icon {
@@ -364,8 +390,8 @@ button, input, select, textarea {
   cursor: pointer;
 }
 .seg button.active {
-  background: var(--gold);
-  color: var(--bg);
+  background: var(--accent);
+  color: var(--accent-contrast);
   font-weight: 600;
 }
 
@@ -379,9 +405,9 @@ button, input, select, textarea {
   width: 100%;
   padding: 12px;
   border-radius: 12px;
-  border: 1px dashed var(--gold);
+  border: 1px dashed var(--accent);
   background: transparent;
-  color: var(--gold);
+  color: var(--accent);
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
@@ -397,15 +423,15 @@ button, input, select, textarea {
   padding: 5px 12px;
   margin-right: 6px;
   border-radius: 999px;
-  border: 1px solid var(--gold);
+  border: 1px solid var(--accent);
   border-style: solid;
   font-size: 12px;
 }
 
 .btn--solid {
-  border: 1px solid var(--gold);
-  background: var(--gold);
-  color: var(--bg);
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-contrast);
 }
 .btn--ghost {
   border: 1px solid var(--border);
@@ -473,7 +499,7 @@ button, input, select, textarea {
   background: var(--card);
   outline: none;
 }
-.field input:focus, .field select:focus, .field textarea:focus { border-color: var(--gold); }
+.field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
 
 /* Поле даты: видимый текстовый input + прозрачный нативный date-input сверху.
    iOS Safari/WebKit даёт input[type=date] собственную широкую intrinsic-ширину,
@@ -510,7 +536,7 @@ button, input, select, textarea {
   -webkit-appearance: none;
   appearance: none;
 }
-.datefield:focus-within .datefield__display { border-color: var(--gold); }
+.datefield:focus-within .datefield__display { border-color: var(--accent); }
 
 .form-row {
   display: grid;
@@ -544,7 +570,7 @@ button, input, select, textarea {
   display: flex;
   max-width: 480px;
   margin: 0 auto;
-  background: var(--card);
+  background: var(--bg);
   border-top: 1px solid var(--border);
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -563,7 +589,7 @@ button, input, select, textarea {
   cursor: pointer;
   position: relative;
 }
-.nav button.active { color: var(--gold); }
+.nav button.active { color: var(--accent); }
 .nav__icon { font-size: 19px; line-height: 1; }
 
 .nav__badge {
@@ -682,8 +708,8 @@ button, input, select, textarea {
   transition: background 0.18s ease, border-color 0.18s ease;
 }
 .switch--on {
-  background: var(--gold);
-  border-color: var(--gold);
+  background: var(--accent);
+  border-color: var(--accent);
 }
 .switch__knob {
   position: absolute;
@@ -697,7 +723,7 @@ button, input, select, textarea {
 }
 .switch--on .switch__knob {
   transform: translateX(19px);
-  background: var(--bg);
+  background: var(--accent-contrast);
 }
 
 /* ---------- выбор иконки задачи ---------- */
@@ -718,7 +744,7 @@ button, input, select, textarea {
   cursor: pointer;
 }
 .icon-choice--active {
-  border-color: var(--gold);
+  border-color: var(--accent);
   background: var(--soft);
 }
 
@@ -744,3 +770,112 @@ button, input, select, textarea {
 .modal .btn + .section-title { margin-top: 14px; }
 
 .row__countdown { font-weight: 600; margin-top: 4px; }
+
+/* ---------- карточка заправки ---------- */
+
+.fuel-card {
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.fuel-card__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.fuel-card__icon {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--fuel-soft);
+  color: var(--fuel);
+  font-size: 16px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* бейдж «не до полного» на узких экранах переносится под заголовок, а не ломается */
+.fuel-card__title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+.fuel-card__title .badge { white-space: nowrap; }
+.fuel-card__kind { font-weight: 600; font-size: 14px; }
+.fuel-card__date {
+  margin-left: auto;
+  flex: none;
+  font-weight: 700;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.fuel-card__main {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 12px;
+}
+.fuel-card__label { font-size: 11px; color: var(--muted); }
+.fuel-card__big {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.3px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.fuel-card__big small { font-size: 13px; font-weight: 500; color: var(--muted); }
+.fuel-card__big--sum { color: var(--accent); }
+.fuel-card__right { text-align: right; }
+.fuel-card__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.fuel-card__row b {
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.fuel-card__row--foot {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.fuel-card__note { font-size: 12px; color: var(--muted); margin-top: 6px; }
+/* действия слева, чтобы их не перекрывала плавающая кнопка «+» */
+.fuel-card .row__actions { margin-top: 6px; }
+
+.fab {
+  position: fixed;
+  right: max(18px, calc(50% - 240px + 18px));
+  bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 18px);
+  z-index: 25;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 30px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 18px rgba(20, 60, 80, 0.18);
+  transition: transform 0.15s ease;
+}
+.fab:active { transform: scale(0.94); }
+/* экран с плавающей кнопкой: чтобы она не закрывала последнюю карточку */
+.screen--fab { padding-bottom: 84px; }

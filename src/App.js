@@ -34,7 +34,7 @@ export default function App() {
   // заготовка формы ТО для сценария «Выполнить» из раздела «Задачи»
   const [serviceDraft, setServiceDraft] = useState(null);
 
-  const [theme, setTheme] = usePersistentState(KEYS.theme, "dark");
+  const [theme, setTheme] = usePersistentState(KEYS.theme, "light");
   const [fuel, setFuel] = usePersistentState(KEYS.fuel, INITIAL_FUEL, migrateFuel);
   const [service, setService] = usePersistentState(KEYS.service, INITIAL_SERVICE, migrateService);
   const [reminders, setReminders] = usePersistentState(KEYS.reminders, INITIAL_REMINDERS, migrateReminders);
@@ -57,7 +57,7 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const safeTheme = THEMES.includes(theme) ? theme : "dark";
+  const safeTheme = THEMES.includes(theme) ? theme : "light";
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", safeTheme);
