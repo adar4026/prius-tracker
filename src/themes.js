@@ -2,7 +2,7 @@ export const THEMES = ["dark", "light", "sepia"];
 
 export const THEME_META = {
   dark:  { icon: "🌙", label: "Тёмная",  meta: "#0f0f0f" },
-  light: { icon: "☀️", label: "Светлая", meta: "#eef7fa" },
+  light: { icon: "☀️", label: "Светлая", meta: "#eaf4f7" },
   sepia: { icon: "📖", label: "Сепия",   meta: "#f5f0e8" },
 };
 

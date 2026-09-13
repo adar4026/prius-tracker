@@ -25,7 +25,7 @@
 
 /* светлая тема — «холодный голубой»: ледяной фон, почти белые карточки, бирюзовый акцент */
 html[data-theme="light"] {
-  --bg: #eef7fa;
+  --bg: #eaf4f7;
   --card: #f7fcfd;
   --border: #dce9ed;
   --text: #14232b;
@@ -775,7 +775,13 @@ button, input, select, textarea {
 
 .fuel-card {
   padding: 16px;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
+}
+/* в голубой теме карточки заправок чисто белые, с нежной рамкой и воздушной тенью */
+html[data-theme="light"] .fuel-card {
+  background: #ffffff;
+  border-color: #d4e2e8;
+  box-shadow: 0 4px 14px rgba(32, 74, 91, 0.10);
 }
 .fuel-card__head {
   display: flex;
