@@ -9,8 +9,8 @@
     { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
     { "src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png", "purpose": "any" }
   ],
-  "start_url": ".",
-  "scope": ".",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "theme_color": "#0f0f0f",

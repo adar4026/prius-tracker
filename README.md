@@ -63,16 +63,30 @@ npm start
 (`version`, `exportDate`, `fuel`, `service`, `reminders`, `theme`) и импорт
 из файла с проверкой структуры и подтверждением перед заменой.
 
-## Деплой на GitHub Pages
+## Деплой на Cloudflare Pages (основной)
+
+Проект `lexcar` в Cloudflare Pages подключён к репозиторию GitHub: каждый
+push в `main` автоматически собирается и публикуется.
+
+- Build command: `npm run build`
+- Build output directory: `build`
+- Framework preset: Create React App
+
+Приложение работает от корня домена (`/`), поэтому `homepage` в `package.json`
+не задаётся. Файл `public/_redirects` (`/* /index.html 200`) отдаёт SPA на
+любой адрес.
+
+## Резервный деплой на GitHub Pages
+
+Старый адрес `https://adar4026.github.io/prius-tracker/` оставлен как резервный.
+`npm run deploy` собирает проект с префиксом `PUBLIC_URL=/prius-tracker` и
+заливает его в ветку `gh-pages`.
+
 
 1. Создайте пустой репозиторий на GitHub (например `prius-tracker`).
 
-2. Впишите свой логин в `package.json` — поле `homepage` должно совпадать
-   с адресом Pages:
-
-   ```json
-   "homepage": "https://ВАШ_ЛОГИН.github.io/prius-tracker"
-   ```
+2. Впишите свой путь в скрипт `predeploy` в `package.json`
+   (`PUBLIC_URL=/имя-репозитория`).
 
 3. Свяжите папку с репозиторием и запушьте:
 
@@ -93,7 +107,7 @@ npm start
 5. В настройках репозитория **Settings → Pages** выберите
    Source: *Deploy from a branch*, ветку `gh-pages`, папку `/ (root)`.
 
-6. Через минуту сайт будет доступен по адресу из `homepage`.
+6. Через минуту сайт будет доступен по адресу `https://ВАШ_ЛОГИН.github.io/имя-репозитория/`.
    Каждое следующее обновление — снова `npm run deploy`.
 
 ## Установка на iPhone
