@@ -1,13 +1,13 @@
 {
   "files": {
-    "main.css": "/prius-tracker/static/css/main.18453bfb.css",
-    "main.js": "/prius-tracker/static/js/main.87466601.js",
+    "main.css": "/prius-tracker/static/css/main.3790a314.css",
+    "main.js": "/prius-tracker/static/js/main.9ae63bdc.js",
     "index.html": "/prius-tracker/index.html",
-    "main.18453bfb.css.map": "/prius-tracker/static/css/main.18453bfb.css.map",
-    "main.87466601.js.map": "/prius-tracker/static/js/main.87466601.js.map"
+    "main.3790a314.css.map": "/prius-tracker/static/css/main.3790a314.css.map",
+    "main.9ae63bdc.js.map": "/prius-tracker/static/js/main.9ae63bdc.js.map"
   },
   "entrypoints": [
-    "static/css/main.18453bfb.css",
-    "static/js/main.87466601.js"
+    "static/css/main.3790a314.css",
+    "static/js/main.9ae63bdc.js"
   ]
 }
