@@ -5,12 +5,12 @@ import VehicleEditor from "../components/VehicleEditor";
 import { CarIcon, CopyIcon, EditIcon } from "../components/Icons";
 import { useToast } from "../components/Toast";
 import { copyText } from "../clipboard";
+import { activeOilReminder } from "../serviceReminder";
 import {
   activeReminder, lastOilChange, lastService, migrateVehicle, validateVehicle,
 } from "../vehicle";
 import { fmtDate, fmtKm, fmtMoney, fmtPrice, kmLeftLabel, nearestDueLabel, num } from "../utils";
 
-const OIL_RE = /масл/i;
 const CVT_RE = /вариатор|atf|трансмис|cvt/i;
 const COOLANT_RE = /антифриз|охлажд|sllc/i;
 const ITV_RE = /itv|техосмотр/i;
@@ -47,7 +47,7 @@ export default function VehiclePage({
   // производные данные из журналов — только то, что реально есть в записях
   const derived = useMemo(() => {
     const oil = lastOilChange(service);
-    const oilReminder = activeReminder(reminders, OIL_RE);
+    const oilReminder = activeOilReminder(reminders, service);
     return {
       oil,
       oilLeft: oilReminder ? kmLeftLabel(oilReminder, currentKm) : null,

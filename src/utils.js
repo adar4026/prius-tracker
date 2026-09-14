@@ -74,6 +74,50 @@ export const byDateDesc = (a, b) => b.date.localeCompare(a.date) || b.km - a.km;
 export const nextId = (list) =>
   list.reduce((max, item) => Math.max(max, item.id || 0), 0) + 1;
 
+/* ---------------- детализация расходов ТО ---------------- */
+
+/** Позиции детализации расходов записи ТО. Порядок — порядок в форме и в сумме. */
+export const COST_PARTS = ["labor", "oil", "filter", "other"];
+
+/**
+ * Детализация расходов: { labor, oil, filter, other }, каждая позиция —
+ * число или null. Если не заполнена ни одна позиция, детализации нет (null):
+ * такая запись ведёт себя как раньше — с одной общей суммой в cost.
+ */
+export const normalizeCosts = (raw) => {
+  if (!raw || typeof raw !== "object") return null;
+  const costs = {};
+  let any = false;
+  COST_PARTS.forEach((k) => {
+    costs[k] = numOrNull(raw[k]);
+    if (costs[k] !== null) any = true;
+  });
+  return any ? costs : null;
+};
+
+/** Сумма заполненных позиций детализации; без детализации — null. */
+export const sumCosts = (costs) => {
+  const c = normalizeCosts(costs);
+  if (!c) return null;
+  return round(COST_PARTS.reduce((s, k) => s + (c[k] ?? 0), 0), 2);
+};
+
+/**
+ * Строка детализации для карточки: «Работа: 30,00 € · Масло и фильтр: 62,88 €».
+ * Масло и фильтр показываются одной позицией — это материалы одного визита,
+ * и в чеке они обычно идут общей суммой. Без детализации — null.
+ */
+export const costBreakdownLabel = (costs) => {
+  const c = normalizeCosts(costs);
+  if (!c) return null;
+  const parts = [];
+  if (c.labor !== null) parts.push(`Работа: ${fmtMoney(c.labor)}`);
+  if (c.oil !== null) parts.push(`Масло и фильтр: ${fmtMoney(round(c.oil + (c.filter ?? 0), 2))}`);
+  else if (c.filter !== null) parts.push(`Масляный фильтр: ${fmtMoney(c.filter)}`);
+  if (c.other !== null) parts.push(`Прочее: ${fmtMoney(c.other)}`);
+  return parts.join(" · ");
+};
+
 /* ---------------- миграция ---------------- */
 
 /**
@@ -126,13 +170,22 @@ export const migrateFuel = (list) =>
   (Array.isArray(list) ? list : []).map(migrateFuelEntry);
 
 export const migrateService = (list) =>
-  (Array.isArray(list) ? list : []).map((s) => ({
-    ...s,
-    // km и cost могут быть неизвестны — тогда null, а не 0
-    km: s.km === null || s.km === undefined ? null : Math.round(num(s.km)),
-    cost: s.cost === undefined ? 0 : numOrNull(s.cost),
-    note: s.note || "",
-  }));
+  (Array.isArray(list) ? list : []).map((s) => {
+    const costs = normalizeCosts(s.costs);
+    return {
+      ...s,
+      // km и cost могут быть неизвестны — тогда null, а не 0
+      km: s.km === null || s.km === undefined ? null : Math.round(num(s.km)),
+      // общая сумма хранится всегда; если её нет, а детализация есть — берётся её сумма
+      cost:
+        s.cost === undefined || s.cost === null
+          ? costs ? sumCosts(costs) : s.cost === undefined ? 0 : null
+          : numOrNull(s.cost),
+      // детализация расходов необязательна: у старых записей её нет (null)
+      costs,
+      note: s.note || "",
+    };
+  });
 
 /**
  * Задачи. Поля связи с ТО добавляются аддитивно: у старых задач они null,
@@ -389,6 +442,9 @@ export const serviceSearchText = (s, categoryLabel = "") =>
     s.type, s.note,
     s.category, categoryLabel,
     numTokens(s.cost, 2), "€ стоимость",
+    // детализация ищется и по ярлыкам («работа»), и по суммам позиций
+    costBreakdownLabel(s.costs) || "",
+    ...(s.costs ? COST_PARTS.map((k) => numTokens(s.costs[k], 2)) : []),
   ].join(" ");
 
 /* ---------------- сколько прошло с записи ---------------- */

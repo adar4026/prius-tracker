@@ -1,6 +1,7 @@
 import React from "react";
 import Stat from "../components/Stat";
 import { lastOilChange } from "../vehicle";
+import { activeOilReminder } from "../serviceReminder";
 import {
   avg, byDateDesc, consumptionPoints, fmtDate, fmtKm, fmtMoney, fmtNum,
   kmLeftLabel, nearestDueLabel, num, reminderStatus, reminderUrgency,
@@ -14,11 +15,12 @@ export default function HomeTab({
   const avgPrice = avg(fuel.map((f) => num(f.pricePerL)).filter((p) => p > 0));
 
   const oil = lastOilChange(service);
-  // прогресс ведём от того же dueKm, что и в задаче "Моторное масло 0W-20" —
-  // без собственного фиксированного интервала
-  const oilReminder = reminders.find((r) => r.title === "Моторное масло 0W-20");
+  // прогресс ведём от dueKm актуальной задачи следующей замены (в первую
+  // очередь созданной из последней замены) — без собственного интервала
+  const oilReminder = activeOilReminder(reminders, service);
   const dueKm = oilReminder?.dueKm ?? null;
-  const driven = oil ? currentKm - oil.km : 0;
+  // текущий пробег может быть ниже пробега свежей записи ТО — тогда 0, не минус
+  const driven = oil ? Math.max(0, currentKm - oil.km) : 0;
   const totalSpan = oil && dueKm !== null ? dueKm - oil.km : null;
   const pct = totalSpan ? Math.min(100, Math.max(0, Math.round((driven / totalSpan) * 100))) : 0;
   const oilLeft = dueKm !== null ? kmLeftLabel({ dueKm, completed: false }, currentKm) : null;
@@ -32,6 +34,9 @@ export default function HomeTab({
 
   const recent = [...fuel].sort(byDateDesc).slice(0, 3);
   const lastFill = recent[0];
+  // откуда взят текущий пробег: заправка или запись ТО с максимальным показанием
+  const kmFromFuel = fuel.find((f) => f.km === currentKm);
+  const kmFromService = kmFromFuel ? null : service.find((s) => s.km === currentKm);
 
   return (
     <main className="screen screen--home">
@@ -41,7 +46,13 @@ export default function HomeTab({
           {fmtKm(currentKm)} <span className="hero__unit">км</span>
         </div>
         <div className="hero__note">
-          {lastFill ? `Последняя заправка ${fmtDate(lastFill.date)}` : "Нет данных о заправках"}
+          {kmFromFuel
+            ? `Последняя заправка: ${fmtDate(kmFromFuel.date)}`
+            : kmFromService
+              ? `Последняя запись ТО: ${fmtDate(kmFromService.date)}`
+              : lastFill
+                ? `Последняя заправка: ${fmtDate(lastFill.date)}`
+                : "Нет данных о пробеге"}
         </div>
       </div>
 

@@ -699,6 +699,34 @@ html[data-theme="light"] .filter-btn--active {
 
 .hint { font-size: 11px; color: var(--muted); margin-top: 6px; }
 
+/* блок формы с заголовком: «Расходы» в записи ТО */
+.form-block {
+  padding: 10px 12px 8px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--soft);
+}
+.form-block__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.form-block .field:last-child { margin-bottom: 0; }
+.form-block__total {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.form-block .hint { margin-top: 4px; }
+.field input:read-only { color: var(--muted); }
+
 /* ---------- напоминания ---------- */
 
 .reminder { display: flex; gap: 11px; align-items: flex-start; }

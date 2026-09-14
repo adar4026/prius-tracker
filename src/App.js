@@ -12,7 +12,9 @@ import VehiclePage from "./pages/VehiclePage";
 import SettingsPage from "./pages/SettingsPage";
 import { KEYS, usePersistentState } from "./storage";
 import { INITIAL_FUEL, INITIAL_SERVICE, INITIAL_REMINDERS } from "./data";
-import { HISTORY_IMPORTS, applyFuelBatch, applyServiceBatch } from "./history";
+import {
+  HISTORY_IMPORTS, applyFuelBatch, applyReminderBatch, applyServiceBatch,
+} from "./history";
 import { THEMES, THEME_META } from "./themes";
 import { CATEGORY_ICONS } from "./data";
 import { VEHICLE_DEFAULTS, migrateVehicle } from "./vehicle";
@@ -75,7 +77,13 @@ export default function App() {
     if (!pending.length) return;
 
     setFuel((prev) => pending.reduce(applyFuelBatch, prev));
-    setService((prev) => pending.reduce(applyServiceBatch, prev));
+    // задачи партии ссылаются на записи ТО по дате и виду работ, поэтому
+    // применяются к уже долитому списку
+    const nextService = pending.reduce(applyServiceBatch, service);
+    setService(nextService);
+    setReminders((prev) =>
+      pending.reduce((acc, batch) => applyReminderBatch(acc, nextService, batch), prev)
+    );
     setImportsDone((prev) =>
       [...new Set([...(Array.isArray(prev) ? prev : []), ...pending.map((b) => b.id)])]
     );
@@ -91,9 +99,16 @@ export default function App() {
     if (meta) meta.setAttribute("content", THEME_META[safeTheme].meta);
   }, [safeTheme]);
 
+  // максимальный известный пробег по всем записям: свежая запись ТО может
+  // быть позже последней заправки
   const currentKm = useMemo(
-    () => fuel.reduce((max, f) => Math.max(max, f.km), 0),
-    [fuel]
+    () =>
+      Math.max(
+        0,
+        ...fuel.map((f) => f.km || 0),
+        ...service.map((s) => s.km || 0)
+      ),
+    [fuel, service]
   );
 
   // красный бейдж считает только невыполненные просроченные задачи
@@ -158,7 +173,9 @@ export default function App() {
 
   /**
    * «Выполнить» в задаче открывает форму нового ТО с подставленным названием.
-   * Категория берётся из исходной сервисной записи, если задача создана из неё.
+   * Если задача создана из сервисной записи, вид работ и категория берутся
+   * из неё: название задачи («Заменить моторное масло 0W-20») — это
+   * формулировка задачи, а не вид работ.
    */
   const completeReminder = useCallback(
     (reminder) => {
@@ -171,7 +188,7 @@ export default function App() {
         "oil";
       setServiceDraft({
         reminderId: reminder.id,
-        form: { type: reminder.title, category },
+        form: { type: source?.type || reminder.title, category },
       });
       setTab("service");
     },
@@ -271,6 +288,7 @@ export default function App() {
               reminders={reminders}
               setReminders={setReminders}
               currentKm={currentKm}
+              oilGrade={vehicle.oil?.grade || ""}
               year={year}
               onYear={setYear}
               draft={serviceDraft}

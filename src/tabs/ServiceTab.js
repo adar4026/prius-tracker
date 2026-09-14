@@ -5,28 +5,99 @@ import JournalFilter from "../components/JournalFilter";
 import FilterMenu from "../components/FilterMenu";
 import NextServiceFields from "../components/NextServiceFields";
 import useFocusEntry from "../components/useFocusEntry";
-import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS } from "../data";
+import { CATEGORY_COLORS, CATEGORY_LABELS, OIL_INTERVAL_DEFAULTS } from "../data";
 import {
-  addMonths, byDateDesc, elapsedLabel, entryYear, fmtDate, fmtKm, fmtMoney,
-  matchesQuery, nextId, num, numOrNull, serviceSearchText, todayISO, yearsOf,
+  isOilChangeReminder, plannedReminderFields, serviceReminderNote,
+} from "../serviceReminder";
+import {
+  addMonths, byDateDesc, costBreakdownLabel, elapsedLabel, entryYear, fmtDate,
+  fmtKm, fmtMoney, matchesQuery, nextId, normalizeCosts, num, numOrNull,
+  serviceSearchText, sumCosts, todayISO, yearsOf,
 } from "../utils";
 
 const CATS = Object.keys(CATEGORY_LABELS);
 const today = () => todayISO();
 
+// поля формы ↔ позиции детализации расходов (см. COST_PARTS в utils)
+const COST_FIELDS = { costLabor: "labor", costOil: "oil", costFilter: "filter", costOther: "other" };
+
 const emptyForm = () => ({
   date: today(), km: "", type: "", cost: "", note: "", category: "oil",
+  // блок «Расходы» — детализация общей стоимости для замены масла
+  costLabor: "", costOil: "", costFilter: "", costOther: "",
   // блок «Следующая замена»
   planNext: false, intervalKm: "", intervalMonths: "", nextKm: "", nextDate: "",
   nextKmTouched: false, nextDateTouched: false,
 });
+
+/** Детализация из полей формы; null, если ни одна позиция не заполнена. */
+const formCosts = (f) =>
+  normalizeCosts(
+    Object.fromEntries(Object.entries(COST_FIELDS).map(([field, part]) => [part, f[field]]))
+  );
+
+/** Блок «Расходы» показывается только для замены масла. */
+const hasCostBlock = (f) => f.category === "oil";
+
+/**
+ * Одно изменение формы со всеми следствиями. Вынесено из setState, чтобы
+ * заготовка формы («Выполнить» из задач) проходила через ту же логику.
+ *
+ * Пробег и дата следующей замены пересчитываются от интервала, но только
+ * пока пользователь не исправил их руками — иначе ручное значение затиралось
+ * бы при любой правке даты или пробега.
+ */
+function applyChange(f, name, value) {
+  const next = { ...f, [name]: value };
+  if (name === "nextKm") next.nextKmTouched = true;
+  if (name === "nextDate") next.nextDateTouched = true;
+  // выбор интервала — явное намерение пересчитать, ручная правка снимается
+  if (name === "intervalKm") next.nextKmTouched = false;
+  if (name === "intervalMonths") next.nextDateTouched = false;
+
+  // детализация расходов заполняет общую стоимость своей суммой;
+  // если все позиции стёрты, общая сумма снова вводится вручную
+  if (name in COST_FIELDS) {
+    const total = sumCosts(formCosts(next));
+    if (total !== null) next.cost = String(total);
+  }
+
+  // включённый план для замены масла получает интервал по умолчанию —
+  // только в пустые поля, введённое пользователем не трогается
+  const planTurnedOn = name === "planNext" && value;
+  const becameOil = name === "category" && value === "oil" && next.planNext;
+  if ((planTurnedOn || becameOil) && next.category === "oil") {
+    if (next.intervalKm === "") {
+      next.intervalKm = String(OIL_INTERVAL_DEFAULTS.km);
+      next.nextKmTouched = false;
+    }
+    if (next.intervalMonths === "") {
+      next.intervalMonths = String(OIL_INTERVAL_DEFAULTS.months);
+      next.nextDateTouched = false;
+    }
+  }
+
+  const recalc = ["km", "date", "intervalKm", "intervalMonths", "planNext", "category"];
+  if (recalc.includes(name) && next.planNext) {
+    const baseKm = Math.round(num(next.km));
+    const stepKm = Math.round(num(next.intervalKm));
+    if (!next.nextKmTouched && baseKm > 0 && stepKm > 0) {
+      next.nextKm = String(baseKm + stepKm);
+    }
+    const months = Math.round(num(next.intervalMonths));
+    if (!next.nextDateTouched && next.date && months > 0) {
+      next.nextDate = addMonths(next.date, months) || "";
+    }
+  }
+  return next;
+}
 
 /** Задача, созданная из этой сервисной записи (связь живёт на стороне задачи). */
 export const linkedReminder = (reminders, serviceId) =>
   reminders.find((r) => r.sourceServiceId === serviceId) || null;
 
 export default function ServiceTab({
-  service, setService, reminders, setReminders, currentKm,
+  service, setService, reminders, setReminders, currentKm, oilGrade,
   year, onYear, draft, onDraftUsed, focus, onFocused,
 }) {
   const [filter, setFilter] = useState("all");
@@ -89,38 +160,14 @@ export default function ServiceTab({
   const free = visible.filter((r) => numOrNull(r.cost) === 0).length;
   const unknown = visible.filter((r) => numOrNull(r.cost) === null).length;
 
-  /**
-   * Пробег и дата следующей замены пересчитываются от интервала, но только
-   * пока пользователь не исправил их руками — иначе ручное значение затиралось
-   * бы при любой правке даты или пробега.
-   */
-  const setField = (name, value) =>
-    setForm((f) => {
-      const next = { ...f, [name]: value };
-      if (name === "nextKm") next.nextKmTouched = true;
-      if (name === "nextDate") next.nextDateTouched = true;
-      // выбор интервала — явное намерение пересчитать, ручная правка снимается
-      if (name === "intervalKm") next.nextKmTouched = false;
-      if (name === "intervalMonths") next.nextDateTouched = false;
+  const setField = (name, value) => setForm((f) => applyChange(f, name, value));
 
-      const recalc = ["km", "date", "intervalKm", "intervalMonths", "planNext"];
-      if (recalc.includes(name) && next.planNext) {
-        const baseKm = Math.round(num(next.km));
-        const stepKm = Math.round(num(next.intervalKm));
-        if (!next.nextKmTouched && baseKm > 0 && stepKm > 0) {
-          next.nextKm = String(baseKm + stepKm);
-        }
-        const months = Math.round(num(next.intervalMonths));
-        if (!next.nextDateTouched && next.date && months > 0) {
-          next.nextDate = addMonths(next.date, months) || "";
-        }
-      }
-      return next;
-    });
-
+  // заготовка применяется по полю, чтобы сработали те же следствия, что и при вводе
   const openAdd = (prefill = null) => {
     setEditing(null);
-    setForm({ ...emptyForm(), ...(prefill || {}) });
+    setForm(
+      Object.entries(prefill || {}).reduce((f, [k, v]) => applyChange(f, k, v), emptyForm())
+    );
     setError("");
     setOpen(true);
   };
@@ -134,6 +181,11 @@ export default function ServiceTab({
       km: item.km ? String(item.km) : "",
       type: item.type,
       cost: item.cost === null || item.cost === undefined ? "" : String(item.cost),
+      ...Object.fromEntries(
+        Object.entries(COST_FIELDS).map(([field, part]) => [
+          field, item.costs && item.costs[part] !== null ? String(item.costs[part]) : "",
+        ])
+      ),
       note: item.note || "",
       category: item.category,
       // план следующей замены хранится в связанной задаче, а не дублируется в ТО
@@ -174,12 +226,15 @@ export default function ServiceTab({
     if (form.planNext && !nextKm && !nextDate)
       return setError("Укажите следующий пробег или следующую дату");
 
+    // детализация есть только у замены масла; при ней общая сумма — сумма позиций
+    const costs = hasCostBlock(form) ? formCosts(form) : null;
     const entry = {
       id: editing ? editing.id : nextId(service),
       date: form.date,
       km: form.km === "" ? null : Math.round(num(form.km)),
       type: form.type.trim(),
-      cost: numOrNull(form.cost),
+      cost: costs ? sumCosts(costs) : numOrNull(form.cost),
+      costs,
       note: form.note.trim(),
       category: form.category,
     };
@@ -199,32 +254,58 @@ export default function ServiceTab({
    * Существующая задача обновляется, а не дублируется; выполненная задача
    * своё «выполнено» не теряет. Выключенный план удаляет только незакрытую
    * задачу — историю выполненных не трогаем.
+   *
+   * Новая замена масла закрывает все прежние активные задачи про моторное
+   * масло, а не только ту, из которой нажали «Выполнить»: одновременно
+   * активна одна задача следующей замены. Правка старой записи ничего не
+   * закрывает.
    */
   const syncReminder = (entry, { nextKm, nextDate }) => {
     const linked = linkedReminder(reminders, entry.id);
     const closing = draftReminderId; // задача, которую закрывает эта запись
+    const closesOil = !editing && entry.category === "oil";
 
     setReminders((list) => {
       let out = list;
 
+      if (closesOil) {
+        out = out.map((r) =>
+          !r.completed && r.sourceServiceId !== entry.id && isOilChangeReminder(r, service)
+            ? {
+                ...r,
+                completed: true,
+                completedDate: entry.date,
+                completedKm: entry.km,
+                completedServiceId: entry.id,
+              }
+            : r
+        );
+      }
+
       if (form.planNext) {
-        const fields = {
-          title: entry.type,
-          icon: CATEGORY_ICONS[entry.category] || "🔧",
+        const fields = plannedReminderFields(entry, {
           dueKm: nextKm,
           dueDate: nextDate,
-          intervalKm: numOrNull(form.intervalKm),
-          intervalMonths: numOrNull(form.intervalMonths),
-          sourceServiceId: entry.id,
-        };
+          intervalKm: form.intervalKm,
+          intervalMonths: form.intervalMonths,
+          oilGrade,
+        });
+        const note = serviceReminderNote(entry, fields.intervalKm, fields.intervalMonths);
+        // примечание задачи обновляется вслед за записью, только если оно
+        // всё ещё автоматическое — своё пользователь не теряет
+        const autoNote =
+          !linked || !linked.note ||
+          (editing && linked.note === serviceReminderNote(editing, linked.intervalKm, linked.intervalMonths));
         out = linked
-          ? out.map((r) => (r.id === linked.id ? { ...r, ...fields } : r))
+          ? out.map((r) =>
+              r.id === linked.id ? { ...r, ...fields, note: autoNote ? note : r.note } : r
+            )
           : [
               ...out,
               {
                 id: nextId(out),
                 priority: "upcoming",
-                note: "",
+                note,
                 completed: false,
                 completedDate: null,
                 completedKm: null,
@@ -234,6 +315,15 @@ export default function ServiceTab({
             ];
       } else if (linked && !linked.completed) {
         out = out.filter((r) => r.id !== linked.id);
+      }
+
+      // правка записи подтягивает дату и пробег в задачах, которые она закрыла
+      if (editing) {
+        out = out.map((r) =>
+          r.completedServiceId === entry.id
+            ? { ...r, completedDate: entry.date, completedKm: entry.km }
+            : r
+        );
       }
 
       // запись создана кнопкой «Выполнить» — закрываем исходную задачу
@@ -268,22 +358,29 @@ export default function ServiceTab({
       question += `\n\nСвязанная задача «${linked.title}» выполнена — она останется в истории, связь будет снята.`;
     }
     if (closed.length) {
-      question += `\n\nУ ${closed.length} выполненной задачи снимется отметка о закрывшей её записи.`;
+      question += `\n\nЗадач, закрытых этой записью: ${closed.length} — они снова станут активными.`;
     }
     if (!window.confirm(question)) return;
 
     setService(service.filter((s) => s.id !== id));
-    // битых ссылок не оставляем ни в одну сторону
+    // битых ссылок не оставляем ни в одну сторону; задачи, которые закрыла
+    // удаляемая запись, возвращаются в работу — удаление отменяет «выполнено»
     setReminders((list) =>
       list
         .filter((r) => !(r.sourceServiceId === id && !r.completed))
         .map((r) => ({
           ...r,
           sourceServiceId: r.sourceServiceId === id ? null : r.sourceServiceId,
-          completedServiceId: r.completedServiceId === id ? null : r.completedServiceId,
+          ...(r.completedServiceId === id
+            ? { completed: false, completedDate: null, completedKm: null, completedServiceId: null }
+            : {}),
         }))
     );
   };
+
+  // пока заполнена хоть одна позиция детализации, общая стоимость — её сумма
+  const breakdownTotal = hasCostBlock(form) ? sumCosts(formCosts(form)) : null;
+  const breakdownActive = breakdownTotal !== null;
 
   return (
     <main className="screen">
@@ -351,6 +448,7 @@ export default function ServiceTab({
                 </span>
               </div>
               {s.note && <div className="row__sub">{s.note}</div>}
+              {s.costs && <div className="row__sub row__breakdown">{costBreakdownLabel(s.costs)}</div>}
               {(() => {
                 const linked = linkedReminder(reminders, s.id);
                 if (!linked) return null;
@@ -419,6 +517,8 @@ export default function ServiceTab({
                 <input
                   type="number" step="0.01" inputMode="decimal" placeholder="неизвестно"
                   value={form.cost} onChange={(e) => setField("cost", e.target.value)}
+                  readOnly={breakdownActive}
+                  aria-describedby={breakdownActive ? "cost-total-hint" : undefined}
                 />
               </div>
               <div className="field">
@@ -430,6 +530,53 @@ export default function ServiceTab({
                 </select>
               </div>
             </div>
+
+            {hasCostBlock(form) && (
+              <div className="form-block">
+                <div className="form-block__title">Расходы</div>
+                <div className="form-row">
+                  <div className="field">
+                    <label>Работа, €</label>
+                    <input
+                      type="number" step="0.01" inputMode="decimal" placeholder="0,00"
+                      value={form.costLabor} onChange={(e) => setField("costLabor", e.target.value)}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Масло, €</label>
+                    <input
+                      type="number" step="0.01" inputMode="decimal" placeholder="0,00"
+                      value={form.costOil} onChange={(e) => setField("costOil", e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="form-row">
+                  <div className="field">
+                    <label>Масляный фильтр, €</label>
+                    <input
+                      type="number" step="0.01" inputMode="decimal" placeholder="0,00"
+                      value={form.costFilter} onChange={(e) => setField("costFilter", e.target.value)}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Прочие расходы, €</label>
+                    <input
+                      type="number" step="0.01" inputMode="decimal" placeholder="0,00"
+                      value={form.costOther} onChange={(e) => setField("costOther", e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="form-block__total">
+                  <span>Итого</span>
+                  <span>{breakdownActive ? fmtMoney(breakdownTotal) : "—"}</span>
+                </div>
+                <div className="hint" id="cost-total-hint">
+                  {breakdownActive
+                    ? "Общая стоимость считается из этих позиций."
+                    : "Можно не заполнять — тогда укажите только общую стоимость."}
+                </div>
+              </div>
+            )}
 
             <div className="field">
               <label>Примечание</label>

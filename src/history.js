@@ -12,7 +12,10 @@
 //   • признак дубля для заправки — совпадение пробега (приложение и так
 //     запрещает две заправки с одинаковым km), для ТО — дата + вид работ.
 
-import { migrateFuel, migrateService, nextId } from "./utils";
+import { migrateFuel, migrateReminders, migrateService, nextId } from "./utils";
+import {
+  dueFromInterval, plannedReminderFields, serviceReminderNote,
+} from "./serviceReminder";
 
 /* ---------------- заправки ---------------- */
 // station/note взяты из старого журнала как есть.
@@ -243,6 +246,32 @@ const SERVICE_PATCHES_2 = [
   },
 ];
 
+/* ---------------- замена масла 14.09.2026 ---------------- */
+// Первая запись с раздельными расходами: работа мастера отдельно от масла
+// и фильтра, общая стоимость — сумма позиций (масло и фильтр в чеке одной
+// строкой, поэтому они в одной позиции). Задача на следующую замену
+// создаётся так же, как её создала бы форма с включённым планом, а прежняя
+// задача «Моторное масло 0W-20» закрывается этой записью.
+
+const OIL_CHANGE_2026_09 = {
+  date: "2026-09-14", km: 221570,
+  type: "Масло Toyota 0W-20 + фильтр MANN HU 6006 z",
+  cost: 92.88,
+  costs: { labor: 30, oil: 62.88, filter: null, other: null },
+  note: "Ростик Felguera",
+  category: "oil",
+};
+
+const OIL_SOURCE_2026_09 = { date: OIL_CHANGE_2026_09.date, type: OIL_CHANGE_2026_09.type };
+
+const REMINDER_COMPLETIONS_2026_09 = [
+  { match: { title: "Моторное масло 0W-20" }, by: OIL_SOURCE_2026_09 },
+];
+
+const PLANNED_REMINDERS_2026_09 = [
+  { source: OIL_SOURCE_2026_09, intervalKm: 15000, intervalMonths: 12, oilGrade: "0W-20" },
+];
+
 /** Разовые миграции истории. Каждая применяется не более одного раза. */
 export const HISTORY_IMPORTS = [
   {
@@ -263,6 +292,12 @@ export const HISTORY_IMPORTS = [
   {
     id: "mycar-svechi-fix-2026-09-3",
     servicePatches: SERVICE_PATCHES_2,
+  },
+  {
+    id: "oil-change-2026-09-14",
+    service: [OIL_CHANGE_2026_09],
+    reminderCompletions: REMINDER_COMPLETIONS_2026_09,
+    plannedReminders: PLANNED_REMINDERS_2026_09,
   },
 ];
 
@@ -365,4 +400,59 @@ export function applyServiceBatch(list, batch) {
   });
 
   return migrateService(out);
+}
+
+/**
+ * Задачи партии. Ссылаются на записи ТО по дате и виду работ, поэтому
+ * применяются к уже долитому списку service.
+ *   reminderCompletions — какие активные задачи закрывает запись ТО
+ *     (по названию; уже выполненные не трогаются);
+ *   plannedReminders — задачи на следующую замену, посчитанные от записи
+ *     интервалом, как это делает форма ТО. Если из записи задача уже создана
+ *     (формой или прежним импортом), новая не добавляется.
+ */
+export function applyReminderBatch(list, service, batch) {
+  let out = list;
+
+  (batch.reminderCompletions || []).forEach((c) => {
+    const entry = service.find((s) => matchesService(s, c.by));
+    if (!entry) return;
+    out = out.map((r) =>
+      !r.completed && r.title === c.match.title
+        ? {
+            ...r,
+            completed: true,
+            completedDate: entry.date,
+            completedKm: entry.km,
+            completedServiceId: entry.id,
+          }
+        : r
+    );
+  });
+
+  (batch.plannedReminders || []).forEach((p) => {
+    const entry = service.find((s) => matchesService(s, p.source));
+    if (!entry || out.some((r) => r.sourceServiceId === entry.id)) return;
+    const fields = plannedReminderFields(entry, {
+      ...dueFromInterval(entry, p.intervalKm, p.intervalMonths),
+      intervalKm: p.intervalKm,
+      intervalMonths: p.intervalMonths,
+      oilGrade: p.oilGrade,
+    });
+    out = [
+      ...out,
+      {
+        id: nextId(out),
+        priority: "upcoming",
+        note: serviceReminderNote(entry, p.intervalKm, p.intervalMonths),
+        completed: false,
+        completedDate: null,
+        completedKm: null,
+        completedServiceId: null,
+        ...fields,
+      },
+    ];
+  });
+
+  return out === list ? list : migrateReminders(out);
 }
