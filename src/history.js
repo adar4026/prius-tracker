@@ -269,7 +269,24 @@ const REMINDER_COMPLETIONS_2026_09 = [
 ];
 
 const PLANNED_REMINDERS_2026_09 = [
-  { source: OIL_SOURCE_2026_09, intervalKm: 15000, intervalMonths: 12, oilGrade: "0W-20" },
+  { source: OIL_SOURCE_2026_09, intervalKm: 13000, intervalMonths: 12, oilGrade: "0W-20" },
+];
+
+/**
+ * Корректировка интервала: первая версия партии выпущена с 15 000 км, а для
+ * этой замены нужен интервал 13 000 км (234 570 км / 14.09.2027). На устройстве,
+ * где партия уже создала задачу на 236 570 км, пересчитывается именно она —
+ * активная задача, созданная из этой записи и всё ещё с прежним интервалом.
+ * Задачу, интервал которой пользователь уже менял сам, миграция не трогает;
+ * там, где первая партия ещё не применялась, она сразу создаёт 234 570 км,
+ * и корректировке нечего делать.
+ */
+const PLANNED_REMINDER_PATCHES_2026_09 = [
+  {
+    source: OIL_SOURCE_2026_09,
+    from: { intervalKm: 15000, intervalMonths: 12 },
+    to: { intervalKm: 13000, intervalMonths: 12 },
+  },
 ];
 
 /** Разовые миграции истории. Каждая применяется не более одного раза. */
@@ -298,6 +315,10 @@ export const HISTORY_IMPORTS = [
     service: [OIL_CHANGE_2026_09],
     reminderCompletions: REMINDER_COMPLETIONS_2026_09,
     plannedReminders: PLANNED_REMINDERS_2026_09,
+  },
+  {
+    id: "oil-change-2026-09-14-interval-13000",
+    plannedReminderPatches: PLANNED_REMINDER_PATCHES_2026_09,
   },
 ];
 
@@ -409,7 +430,10 @@ export function applyServiceBatch(list, batch) {
  *     (по названию; уже выполненные не трогаются);
  *   plannedReminders — задачи на следующую замену, посчитанные от записи
  *     интервалом, как это делает форма ТО. Если из записи задача уже создана
- *     (формой или прежним импортом), новая не добавляется.
+ *     (формой или прежним импортом), новая не добавляется;
+ *   plannedReminderPatches — смена интервала уже созданной задачи: только
+ *     активной, созданной из указанной записи и с интервалом from — иначе
+ *     задача считается изменённой пользователем и остаётся как есть.
  */
 export function applyReminderBatch(list, service, batch) {
   let out = list;
@@ -452,6 +476,37 @@ export function applyReminderBatch(list, service, batch) {
         ...fields,
       },
     ];
+  });
+
+  (batch.plannedReminderPatches || []).forEach((p) => {
+    const entry = service.find((s) => matchesService(s, p.source));
+    if (!entry) return;
+    const isStale = (r) =>
+      !r.completed &&
+      r.sourceServiceId === entry.id &&
+      r.intervalKm === p.from.intervalKm &&
+      r.intervalMonths === p.from.intervalMonths;
+    if (!out.some(isStale)) return;
+    out = out.map((r) => {
+      if (!isStale(r)) return r;
+      const fields = plannedReminderFields(entry, {
+        ...dueFromInterval(entry, p.to.intervalKm, p.to.intervalMonths),
+        intervalKm: p.to.intervalKm,
+        intervalMonths: p.to.intervalMonths,
+        oilGrade: p.oilGrade,
+      });
+      // примечание обновляется, только если оно всё ещё автоматическое
+      const autoNote =
+        !r.note || r.note === serviceReminderNote(entry, p.from.intervalKm, p.from.intervalMonths);
+      return {
+        ...r,
+        ...fields,
+        // название и иконку задачи миграция не переименовывает
+        title: r.title,
+        icon: r.icon,
+        note: autoNote ? serviceReminderNote(entry, p.to.intervalKm, p.to.intervalMonths) : r.note,
+      };
+    });
   });
 
   return out === list ? list : migrateReminders(out);
