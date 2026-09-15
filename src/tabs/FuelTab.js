@@ -58,9 +58,11 @@ export default function FuelTab({ fuel, setFuel, year, onYear, focus, onFocused 
     [fuel]
   );
 
+  // пробег 0 — «неизвестен» (записи по финансовому журналу): такая заправка
+  // не даёт «Пройдено» ни себе, ни следующей
   const prevKmById = useMemo(() => {
     const map = new Map();
-    const byKm = [...fuel].sort(byKmAsc);
+    const byKm = fuel.filter((f) => f.km > 0).sort(byKmAsc);
     byKm.forEach((f, i) => { if (i > 0) map.set(f.id, byKm[i - 1].km); });
     return map;
   }, [fuel]);
@@ -198,7 +200,8 @@ export default function FuelTab({ fuel, setFuel, year, onYear, focus, onFocused 
   };
 
   const remove = (entry) => {
-    if (!window.confirm(`Удалить заправку от ${fmtDate(entry.date)} (${fmtKm(entry.km)} км)?`)) return;
+    const where = entry.km > 0 ? `${fmtKm(entry.km)} км` : fmtMoney(entry.paidTotal);
+    if (!window.confirm(`Удалить заправку от ${fmtDate(entry.date)} (${where})?`)) return;
     setFuel(recalcFrom(fuel.filter((f) => f.id !== entry.id), entry.km));
   };
 
@@ -262,7 +265,9 @@ export default function FuelTab({ fuel, setFuel, year, onYear, focus, onFocused 
             <div className="fuel-card__main">
               <div>
                 <div className="fuel-card__label">Пробег</div>
-                <div className="fuel-card__big">{fmtKm(f.km)} <small>км</small></div>
+                <div className="fuel-card__big">
+                  {f.km > 0 ? <>{fmtKm(f.km)} <small>км</small></> : "—"}
+                </div>
               </div>
               <div className="fuel-card__right">
                 <div className="fuel-card__label">Сумма</div>

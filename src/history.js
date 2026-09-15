@@ -12,7 +12,7 @@
 //   • признак дубля для заправки — совпадение пробега (приложение и так
 //     запрещает две заправки с одинаковым km), для ТО — дата + вид работ.
 
-import { migrateFuel, migrateReminders, migrateService, nextId } from "./utils";
+import { migrateFuel, migrateReminders, migrateService, nextId, numOrNull } from "./utils";
 import {
   completedBy, dueFromInterval, plannedReminderFields, serviceReminderNote,
   staleOilReminders,
@@ -154,6 +154,34 @@ const SERVICE_PATCHES = [
     set: { km: 126000, note: "TRW, куплены самостоятельно. AutoDoc" },
   },
 ];
+
+/* ---------------- заправки 2024 по финансовому журналу ---------------- */
+// В старом журнале MyCar заправок за 2024 год нет вовсе; в финансовом журнале
+// видны только дата и списанная сумма. Пробег, литры и цена за литр
+// неизвестны и остаются null (пробег в модели хранится как 0 = «неизвестен»,
+// как у записей ТО без одометра). Такие записи участвуют только в деньгах —
+// «Всего расходов», «Ежемесячные затраты», среднее €/мес — а в расход
+// л/100 км и среднюю цену €/л не попадают: без литров и пробега их не посчитать.
+// Сумма партии считается тестом из самого списка — 862,00 €.
+
+const FIN_2024_NOTE = "Восстановлено по финансовому журналу: пробег, литры и цена неизвестны";
+
+const FUEL_2024 = [
+  { date:"2024-05-04", km:null, paidTotal:142.00, note: FIN_2024_NOTE },
+  { date:"2024-06-04", km:null, paidTotal:120.00, note: FIN_2024_NOTE },
+  { date:"2024-07-04", km:null, paidTotal:70.00,  note: FIN_2024_NOTE },
+  { date:"2024-08-26", km:null, paidTotal:120.00, note: FIN_2024_NOTE },
+  { date:"2024-09-06", km:null, paidTotal:120.00, note: FIN_2024_NOTE },
+  { date:"2024-10-01", km:null, paidTotal:120.00, note: FIN_2024_NOTE },
+  { date:"2024-11-21", km:null, paidTotal:120.00, note: FIN_2024_NOTE },
+  { date:"2024-12-01", km:null, paidTotal:50.00,  note: FIN_2024_NOTE },
+];
+
+// Остальные четыре операции 2024 года из журнала в базе уже есть:
+//   25.09 шины 254,00 € и 21.11 страховка 271,17 € — совпадают точь-в-точь;
+//   04.06 масло 62,79 € — в базе замена 08.06 на 50 € (lubricantesweb.es):
+//     похоже, тот же заказ, но дата и сумма расходятся — не трогается;
+//   21.11 дворники 17,71 € — в базе те же дворники на 20 € — не трогается.
 
 /* ---------------- сверка с финансовым журналом: осень 2025 ---------------- */
 // Старый журнал MyCar хранил сумму по чеку (gross), а в финансовом журнале
@@ -368,6 +396,10 @@ export const HISTORY_IMPORTS = [
     id: "fuel-fin-journal-2025-09-10",
     fuelPatches: FUEL_PATCHES_FIN_2025,
   },
+  {
+    id: "fuel-fin-journal-2024",
+    fuel: FUEL_2024,
+  },
 ];
 
 /* ---------------- слияние без дублей ---------------- */
@@ -377,25 +409,33 @@ const FUEL_DEFAULTS = {
   paidTotal: null, station: "", fullTank: true, note: "",
 };
 
+const hasKm = (e) => numOrNull(e.km) !== null && Number(e.km) > 0;
+const fuelMoneyKey = (e) => `${e.date}|${numOrNull(e.paidTotal)}`;
+
 /**
  * Добавляет заправки, которых ещё нет. Дубль определяется по пробегу:
  * приложение само запрещает две заправки с одинаковым km, поэтому запись
  * с уже занятым пробегом считается той же самой, даже если дата отличается.
+ * Запись без пробега (восстановленная по финансовому журналу) сверяется
+ * по дате и оплаченной сумме — как с существующими, так и внутри партии.
  * Расход импортированных записей остаётся пустым, а сохранённые значения
  * существующих записей не пересчитываются — статистика не меняется.
  */
 export function mergeFuel(existing, incoming) {
-  const takenKm = new Set(existing.map((e) => e.km));
+  const takenKm = new Set(existing.filter(hasKm).map((e) => e.km));
+  const takenMoney = new Set(existing.map(fuelMoneyKey));
   const added = [];
   const skipped = [];
   let id = nextId(existing);
 
   incoming.forEach((r) => {
-    if (takenKm.has(r.km)) {
+    const dup = hasKm(r) ? takenKm.has(r.km) : takenMoney.has(fuelMoneyKey(r));
+    if (dup) {
       skipped.push(r);
       return;
     }
-    takenKm.add(r.km);
+    if (hasKm(r)) takenKm.add(r.km);
+    takenMoney.add(fuelMoneyKey(r));
     added.push({ ...FUEL_DEFAULTS, ...r, id: id++, consumption: null });
   });
 

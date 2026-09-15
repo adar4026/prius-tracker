@@ -364,13 +364,15 @@ describe("ежемесячные затраты на топливо (вклад�
 describe("топливо: реальные данные Lexcar", () => {
   const f = HISTORY_IMPORTS.reduce(applyFuelBatch, migrateFuel(INITIAL_FUEL));
 
-  test("финансовые данные о топливе есть с июня 2025, среднее делится на 16 месяцев, а не на 104", () => {
+  test("финансовые данные о топливе есть с мая 2024, среднее делится на 29 месяцев, а не на 104", () => {
     const { months, total, avgPerMonth } = monthlyFuelCosts(f, "all", "2026-09-15");
-    expect(months[0].key).toBe("2025-06");
-    expect(months).toHaveLength(16);
-    // 2542,42 по чекам минус 9,86 скидок осени 2025 из финансового журнала
-    expect(total).toBeCloseTo(2532.56, 2);
-    expect(avgPerMonth).toBeCloseTo(2532.56 / 16, 2);
+    expect(months[0].key).toBe("2024-05");
+    expect(months).toHaveLength(29);
+    // 862,00 (2024, фин. журнал) + 2542,42 по чекам − 9,86 скидок осени 2025
+    expect(total).toBeCloseTo(3394.56, 2);
+    expect(avgPerMonth).toBeCloseTo(3394.56 / 29, 2);
+    // январь–апрель 2025: данные уже ведутся, заправок нет — честные нули внутри диапазона
+    expect(months.filter((m) => m.key >= "2025-01" && m.key <= "2025-05").every((m) => m.total === 0)).toBe(true);
     // 2018 год есть только в ТО — для топлива это «нет данных»
     expect(monthlyFuelCosts(f, "2018", "2026-09-15").months).toEqual([]);
   });

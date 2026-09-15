@@ -1,7 +1,7 @@
 import { INITIAL_FUEL, INITIAL_REMINDERS, INITIAL_SERVICE } from "../data";
-import { HISTORY_IMPORTS, applyFuelBatch, applyReminderBatch, applyServiceBatch } from "../history";
-import { monthlyFuelCosts } from "../analytics";
-import { fmtKm, migrateFuel, migrateReminders, migrateService } from "../utils";
+import { HISTORY_IMPORTS, applyFuelBatch, applyReminderBatch, applyServiceBatch, mergeFuel } from "../history";
+import { mileagePoints, monthlyFuelCosts } from "../analytics";
+import { consumptionPoints, fmtKm, migrateFuel, migrateReminders, migrateService } from "../utils";
 
 const batch = HISTORY_IMPORTS.find((b) => b.id === "oil-change-2026-09-14");
 const apply = (service, reminders) => {
@@ -218,5 +218,85 @@ describe("сверка заправок с финансовым журналом
     expect(out.find((f) => f.km === 197955)).toMatchObject({ paidTotal: 55, discount: 7.02 });
     // остальные правки партии при этом применяются
     expect(out.find((f) => f.km === 199010).paidTotal).toBe(17.26);
+  });
+});
+
+describe("заправки 2024 по финансовому журналу", () => {
+  const FIN24 = HISTORY_IMPORTS.find((b) => b.id === "fuel-fin-journal-2024");
+  const before = HISTORY_IMPORTS.filter((b) => b !== FIN24).reduce(applyFuelBatch, migrateFuel(INITIAL_FUEL));
+  const after = applyFuelBatch(before, FIN24);
+  const y = (list, year) => list.filter((f) => f.date.startsWith(year));
+  const r2 = (v) => Math.round(v * 100) / 100;
+  const total = (list) => r2(list.reduce((s, f) => s + (f.paidTotal || 0), 0));
+
+  test("сумма партии считается из самого списка: 8 операций, 862,00 €", () => {
+    expect(FIN24.fuel).toHaveLength(8);
+    expect(r2(FIN24.fuel.reduce((s, f) => s + f.paidTotal, 0))).toBe(862);
+  });
+
+  test("до импорта заправок 2024 нет, после — все 8 добавлены", () => {
+    expect(y(before, "2024")).toHaveLength(0);
+    expect(y(after, "2024")).toHaveLength(8);
+    expect(total(y(after, "2024"))).toBe(862);
+    expect(after).toHaveLength(before.length + 8);
+  });
+
+  test("пробег, литры и цена остаются неизвестными; расход и цена не считаются", () => {
+    y(after, "2024").forEach((f) => {
+      expect(f.km).toBe(0);
+      expect(f.liters).toBeNull();
+      expect(f.pricePerL).toBeNull();
+      expect(f.grossTotal).toBeNull();
+      expect(f.consumption).toBeNull();
+      expect(f.discount).toBe(0);
+      expect(typeof f.id).toBe("number");
+    });
+    // в статистику расхода и в историю одометра такие записи не попадают
+    expect(mileagePoints(after, []).some((p) => p.date.startsWith("2024"))).toBe(false);
+    expect(consumptionPoints(after).some((p) => p.date.startsWith("2024"))).toBe(false);
+  });
+
+  test("контрольные суммы по месяцам 2024 на графике", () => {
+    const { months, total: t, avgPerMonth } = monthlyFuelCosts(after, "2024", "2026-09-15");
+    expect(months.map((m) => [m.key, m.total])).toEqual([
+      ["2024-05", 142], ["2024-06", 120], ["2024-07", 70], ["2024-08", 120],
+      ["2024-09", 120], ["2024-10", 120], ["2024-11", 120], ["2024-12", 50],
+    ]);
+    expect(t).toBe(862);
+    expect(avgPerMonth).toBeCloseTo(862 / 8, 6);
+  });
+
+  test("данные 2025 и 2026 не меняются", () => {
+    expect(y(after, "2025")).toEqual(y(before, "2025"));
+    expect(y(after, "2026")).toEqual(y(before, "2026"));
+    expect(total(y(after, "2025"))).toBe(1160.89);
+  });
+
+  test("идемпотентность: повторное применение и повтор внутри партии не дублируют", () => {
+    expect(applyFuelBatch(after, FIN24)).toEqual(after);
+    // две записи без пробега с одной датой и суммой — одна заправка
+    const twice = { fuel: [FIN24.fuel[0], { ...FIN24.fuel[0] }] };
+    expect(applyFuelBatch(before, twice)).toHaveLength(before.length + 1);
+    // а с разной суммой в один день — две
+    const two = { fuel: [FIN24.fuel[0], { ...FIN24.fuel[0], paidTotal: 30 }] };
+    expect(applyFuelBatch(before, two)).toHaveLength(before.length + 2);
+  });
+
+  test("запись без пробега не считается дублем заправки с пробегом на другую дату", () => {
+    const own = { ...FIN24.fuel[0], km: 150000 };
+    expect(mergeFuel(before, [own]).added).toHaveLength(1);
+    // но та же дата и сумма, что у пользовательской записи, — дубль
+    const withOwn = mergeFuel(before, [own]).list;
+    expect(applyFuelBatch(withOwn, FIN24)).toHaveLength(withOwn.length + 7);
+  });
+
+  test("записи ТО партия не добавляет: шины и страховка уже есть, масло и дворники — конфликт", () => {
+    expect(FIN24.service).toBeUndefined();
+    const service = HISTORY_IMPORTS.reduce(applyServiceBatch, migrateService(INITIAL_SERVICE)).filter((s) => s.date.startsWith("2024"));
+    expect(service.find((s) => s.date === "2024-09-25" && s.category === "tires").cost).toBe(254);
+    expect(service.find((s) => s.date === "2024-11-21" && s.category === "insurance").cost).toBe(271.17);
+    expect(service.find((s) => s.date === "2024-06-08" && s.category === "oil").cost).toBe(50);
+    expect(service.find((s) => s.date === "2024-11-21" && s.category === "parts").cost).toBe(20);
+    expect(service).toHaveLength(7);
   });
 });
