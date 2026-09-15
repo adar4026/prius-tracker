@@ -176,9 +176,14 @@ export function periodMonthBounds(entries, period, today = todayISO()) {
  *
  * Средняя сумма в месяц = сумма фактических расходов / число календарных
  * месяцев диапазона (включая нулевые). Без записей — total 0, avg null.
+ *
+ * boundsEntries задаёт границы диапазона отдельно от entries: так средний
+ * расход на топливо за год без единой заправки всё равно раскладывается
+ * по всем месяцам года (0 €), а не пропадает — границы берутся из общей
+ * истории (заправки + ТО), а суммы — только из нужной категории.
  */
-export function monthlyExpenses(entries, period, today = todayISO()) {
-  const bounds = periodMonthBounds(entries, period, today);
+export function monthlyExpenses(entries, period, today = todayISO(), boundsEntries = entries) {
+  const bounds = periodMonthBounds(boundsEntries, period, today);
   if (!bounds) return { months: [], total: 0, avgPerMonth: null };
 
   const sums = new Map();
@@ -196,6 +201,71 @@ export function monthlyExpenses(entries, period, today = todayISO()) {
   const total = Math.round(months.reduce((s, m) => s + m.total, 0) * 100) / 100;
   const avgPerMonth = months.length ? total / months.length : null;
   return { months, total, avgPerMonth };
+}
+
+/**
+ * Границы календарных дней диапазона для периода — тот же принцип, что
+ * у periodMonthBounds, но по дням: all — от первой записи до сегодня
+ * (или до последней записи, если она позже), год — с 1 января по
+ * 31 декабря, для текущего года — по сегодня. Без записей за период — null.
+ */
+export function periodDayBounds(entries, period, today = todayISO()) {
+  const dated = entries.filter((e) => inPeriod(e, period)).map((e) => e.date);
+  if (!dated.length) return null;
+  const last = dated.reduce((a, b) => (a > b ? a : b));
+
+  if (period === "all") {
+    const first = dated.reduce((a, b) => (a < b ? a : b));
+    return { from: first, to: last > today ? last : today };
+  }
+
+  const from = `${period}-01-01`;
+  const dec31 = `${period}-12-31`;
+  let to = dec31;
+  if (today < dec31 && today >= from) to = today;
+  if (last > to) to = last;
+  return { from, to };
+}
+
+/**
+ * Расходы на топливо по месяцам выбранного периода вкладки «Затраты».
+ * Границы диапазона — по всей истории (заправки + ТО), суммы — только
+ * из paidTotal заправок, поэтому год без единой заправки всё равно
+ * раскладывается по 12 нулевым месяцам, а не пропадает из графика.
+ */
+export function monthlyFuelCosts(fuel = [], service = [], period, today = todayISO()) {
+  const boundsEntries = expenseEntries(fuel, service);
+  const fuelEntries = expenseEntries(fuel, []);
+  return monthlyExpenses(fuelEntries, period, today, boundsEntries);
+}
+
+/** Среднемесячный расход на топливо за период — avgPerMonth из monthlyFuelCosts. */
+export function averageFuelCostPerMonth(fuel, service, period, today = todayISO()) {
+  return monthlyFuelCosts(fuel, service, period, today).avgPerMonth;
+}
+
+/** Расходы на ТО и ремонт по месяцам выбранного периода — суммы из cost записей ТО. */
+export function serviceCostsByMonth(fuel = [], service = [], period, today = todayISO()) {
+  const boundsEntries = expenseEntries(fuel, service);
+  const serviceEntries = expenseEntries([], service);
+  return monthlyExpenses(serviceEntries, period, today, boundsEntries);
+}
+
+/**
+ * Средний расход на ТО и ремонт в день = сумма cost записей ТО за период /
+ * число календарных дней диапазона (periodDayBounds, по всей истории).
+ * Без записей за период (ни заправок, ни ТО) — null.
+ */
+export function averageServiceCostPerDay(fuel = [], service = [], period, today = todayISO()) {
+  const boundsEntries = expenseEntries(fuel, service);
+  const bounds = periodDayBounds(boundsEntries, period, today);
+  if (!bounds) return null;
+
+  const total = expenseEntries([], service)
+    .filter((e) => inPeriod(e, period) && e.amount !== null && Number.isFinite(e.amount))
+    .reduce((s, e) => s + e.amount, 0);
+  const days = daysBetween(bounds.from, bounds.to) + 1;
+  return days > 0 ? Math.round((total / days) * 100) / 100 : null;
 }
 
 /* ---------------- подписи осей ---------------- */
