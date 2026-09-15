@@ -16,7 +16,7 @@ import {
 } from "../analytics";
 
 const MODES = [
-  { id: "consumption", label: "Расход" },
+  { id: "consumption", label: "Обзор" },
   { id: "price", label: "Цена" },
   { id: "months", label: "Месяцы" },
   { id: "costs", label: "Затраты" },
@@ -33,7 +33,7 @@ const DAY_MS = 86400000;
 
 /**
  * Раздел «Графики»: переключатель режимов. Период («Все» или год) относится
- * к режиму «Расход»: он срезает заправки и записи ТО (fuelP/serviceP), и по
+ * к режиму «Обзор»: он срезает заправки и записи ТО (fuelP/serviceP), и по
  * этому срезу считаются график расхода, минимум/максимум и «Аналитика».
  * Режимы «Цена», «Месяцы» и «Затраты» работают с исходными списками и от
  * периода не зависят. Выбор сохраняется при переключении режимов.
@@ -63,7 +63,7 @@ export default function ChartsTab({ fuel, service, theme }) {
   const activePeriod = options.some((o) => o.id === period) ? period : "all";
   const periodText = periodLabel(activePeriod);
 
-  // срез по периоду для режима «Расход» и его аналитики
+  // срез по периоду для режима «Обзор» и его аналитики
   const fuelP = useMemo(() => filterPeriod(fuel, activePeriod), [fuel, activePeriod]);
   const serviceP = useMemo(() => filterPeriod(service, activePeriod), [service, activePeriod]);
 
@@ -166,7 +166,7 @@ export default function ChartsTab({ fuel, service, theme }) {
 
       {/* ---------- расход топлива ---------- */}
 
-      {/* период режима «Расход»: график, минимум/максимум и аналитика ниже */}
+      {/* период режима «Обзор»: график, минимум/максимум и аналитика ниже */}
       {mode === "consumption" && (
         <div className="filter-row" style={{ paddingTop: 0 }}>
           <FilterMenu name="Период" title="Период" value={activePeriod} options={options} onChange={setPeriod} />
@@ -398,7 +398,7 @@ export default function ChartsTab({ fuel, service, theme }) {
         </>
       )}
 
-      {/* ---------- аналитика: только в режиме «Расход» ---------- */}
+      {/* ---------- аналитика: только в режиме «Обзор» ---------- */}
 
       {mode === "consumption" && (
         <>
