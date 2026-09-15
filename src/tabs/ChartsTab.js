@@ -11,9 +11,9 @@ import {
   MONTHS_SHORT, monthLabel, monthLabelFull, num, numOrNull,
 } from "../utils";
 import {
-  averageFuelCostPerMonth, averageServiceCostPerDay, avgKmPerDay, filterPeriod,
+  averageFuelCostPerMonth, averageServiceCostPerMonth, avgKmPerDay, filterPeriod,
   kmTicks, mileagePoints, monthTicks, monthlyFuelCosts, periodLabel, periodOptions,
-  serviceCostsByMonth, timeTicks, tsToISO, withApproxConsumption,
+  serviceCostsByMonth, serviceCostsByYear, timeTicks, tsToISO, withApproxConsumption,
 } from "../analytics";
 
 const MODES = [
@@ -154,23 +154,33 @@ export default function ChartsTab({ fuel, service, theme }) {
     [fuel, activeCostsPeriod]
   );
 
-  // расходы на ТО и ремонт: крупный показатель — среднее в день, график —
-  // по месяцам, непрерывным рядом (пустой месяц — 0 €, а не пропуск)
-  const serviceMonthly = useMemo(
-    () => serviceCostsByMonth(service, activeCostsPeriod),
+  // расходы на ТО и ремонт: для года — все его месяцы непрерывным рядом
+  // (пустой месяц — 0 €, а не пропуск), для «Все» — по годам, иначе десятки
+  // нулевых месячных столбцов читаются как сплошной разрыв
+  const serviceChart = useMemo(() => {
+    if (activeCostsPeriod === "all") {
+      const { years, total } = serviceCostsByYear(service);
+      return { data: years, total, tick: (k) => k, label: (k) => k };
+    }
+    const { months, total } = serviceCostsByMonth(service, activeCostsPeriod);
+    return {
+      data: months,
+      total,
+      tick: (k) => MONTHS_SHORT[Number(k.slice(5, 7)) - 1],
+      label: (k) => monthLabelFull(`${k}-01`),
+    };
+  }, [service, activeCostsPeriod]);
+  const avgServicePerMonth = useMemo(
+    () => averageServiceCostPerMonth(service, activeCostsPeriod),
     [service, activeCostsPeriod]
   );
-  // для периода в один год подписи — голые короткие месяцы («янв»),
-  // для «Все» (может охватывать несколько лет) — с годом, как у топлива
-  const serviceMonthlyAxis = useMemo(() => {
-    const t = monthTicks(serviceMonthly.months.map((m) => m.key));
-    if (activeCostsPeriod === "all") return t;
-    return { ...t, format: (k) => MONTHS_SHORT[Number(k.slice(5, 7)) - 1] };
-  }, [serviceMonthly, activeCostsPeriod]);
-  const avgServicePerDay = useMemo(
-    () => averageServiceCostPerDay(service, activeCostsPeriod),
-    [service, activeCostsPeriod]
-  );
+  // «Март — 0,00 €» / «2021 — 350,00 €» одной строкой
+  const renderServiceTooltip = ({ active, payload, label }) =>
+    active && payload && payload.length ? (
+      <div style={{ ...tooltipStyle, padding: "6px 10px" }}>
+        {serviceChart.label(label)} — {fmtMoney(payload[0].value)}
+      </div>
+    ) : null;
 
   /* ---------------- пробег ---------------- */
 
@@ -481,34 +491,30 @@ export default function ChartsTab({ fuel, service, theme }) {
             <div className="analytic__period">{costsPeriodText}</div>
           </div>
           <div className="analytic__value">
-            В среднем в день:
-            <b>{fmtMoney(avgServicePerDay)}</b>
+            В среднем в месяц:
+            <b>{fmtMoney(avgServicePerMonth)}</b>
           </div>
-          {serviceMonthly.months.length === 0 ? (
+          {serviceChart.data.length === 0 ? (
             <div className="analytic__empty">Нет данных за период</div>
           ) : (
             <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={serviceMonthly.months} margin={{ top: 10, right: 14, left: -12, bottom: 0 }} barCategoryGap="20%">
+              <BarChart data={serviceChart.data} margin={{ top: 10, right: 14, left: -12, bottom: 0 }} barCategoryGap="20%">
                 <CartesianGrid stroke={c.grid} strokeDasharray="3 3" vertical={false} />
+                {/* все категории остаются в данных; на узком экране recharts
+                    равномерно прячет подписи, которые физически не помещаются */}
                 <XAxis
-                  dataKey="key" ticks={serviceMonthlyAxis.ticks} tickFormatter={serviceMonthlyAxis.format}
-                  {...axisProps} interval={0}
+                  dataKey="key" tickFormatter={serviceChart.tick}
+                  {...axisProps} interval="equidistantPreserveStart" minTickGap={6}
                 />
                 <YAxis {...axisProps} width={50} tickFormatter={(v) => Math.round(v)} />
-                <Tooltip
-                  cursor={{ fill: c.grid, opacity: 0.35 }}
-                  contentStyle={tooltipStyle}
-                  labelStyle={{ color: c.axis }}
-                  labelFormatter={(key) => monthLabelFull(`${key}-01`)}
-                  formatter={(v) => [fmtMoney(v), "ТО и ремонт"]}
-                />
+                <Tooltip cursor={{ fill: c.grid, opacity: 0.35 }} content={renderServiceTooltip} />
                 <Bar dataKey="total" fill={c.blue} radius={[3, 3, 0, 0]} isAnimationActive={false} />
               </BarChart>
             </ResponsiveContainer>
           )}
           <div className="chart-legend">
             <span><i className="dot" style={{ background: c.blue }} /> ТО и ремонт, €</span>
-            <span>всего {fmtMoney(serviceMonthly.total, 0)}</span>
+            <span>всего {fmtMoney(serviceChart.total, 0)}</span>
           </div>
         </div>
       )}

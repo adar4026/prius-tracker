@@ -1,10 +1,10 @@
 import {
-  averageFuelCostPerMonth, averageServiceCostPerDay, avgKmPerDay, daysBetween,
+  averageFuelCostPerMonth, averageServiceCostPerMonth, avgKmPerDay, daysBetween,
   expenseEntries, filterPeriod, inPeriod, isValidISODate, kmTicks, mileagePoints,
-  monthRange, monthTicks, monthlyExpenses, monthlyFuelCosts, periodDayBounds,
-  periodMonthBounds, periodOptions, RECONSTRUCTED_MONTHLY_CONSUMPTION,
-  serviceCostsByMonth, serviceDayBounds, serviceMonthBounds, timeTicks,
-  withApproxConsumption,
+  monthRange, monthTicks, monthlyExpenses, monthlyFuelCosts, monthsBetween,
+  periodDayBounds, periodMonthBounds, periodOptions, RECONSTRUCTED_MONTHLY_CONSUMPTION,
+  serviceCostsByMonth, serviceCostsByYear, serviceDayBounds, serviceMonthBounds,
+  timeTicks, withApproxConsumption,
 } from "../analytics";
 import { INITIAL_FUEL, INITIAL_SERVICE } from "../data";
 import { HISTORY_IMPORTS, applyFuelBatch } from "../history";
@@ -501,43 +501,108 @@ describe("расходы на ТО и ремонт (вкладка «Затра�
     });
   });
 
-  describe("среднее в день (averageServiceCostPerDay)", () => {
-    test("текущий год: сумма расходов / дни с 1 января по сегодня", () => {
-      const serviceList = [service("2026-01-10", 1, 100), service("2026-01-20", 2, 50)];
-      const avg = averageServiceCostPerDay(serviceList, "2026", "2026-01-31");
-      // 150 € / 31 день января, округляется до копеек
-      expect(avg).toBeCloseTo(150 / 31, 2);
+  describe("годовой ряд для периода «Все» (serviceCostsByYear)", () => {
+    test("каждый год от первой записи ТО до текущего, без пропусков; год без расходов — 0 €", () => {
+      const serviceList = [service("2018-05-12", 1, 300), service("2021-03-01", 2, 0), service("2025-08-09", 3, 350)];
+      const { years, total } = serviceCostsByYear(serviceList, "2026-09-15");
+      expect(years.map((y) => y.key)).toEqual(["2018", "2019", "2020", "2021", "2022", "2023", "2024", "2025", "2026"]);
+      expect(years.map((y) => y.total)).toEqual([300, 0, 0, 0, 0, 0, 0, 350, 0]);
+      expect(years.every((y) => y.label === y.key)).toBe(true);
+      expect(total).toBe(650);
     });
 
-    test("прошлый полный год: сумма / полное число дней года, не с первой записи", () => {
-      const serviceList = [service("2025-07-10", 1, 365)];
-      const avg = averageServiceCostPerDay(serviceList, "2025", "2026-09-15");
-      // 365 € / 365 календарных дней 2025 года = 1, а не с июля
-      expect(avg).toBeCloseTo(1, 6);
+    test("несколько записей одного года суммируются, запись без суммы год открывает, но не считается", () => {
+      const serviceList = [service("2024-01-10", 1, null), service("2024-06-01", 2, 40.1), service("2024-12-31", 3, 59.9)];
+      const { years } = serviceCostsByYear(serviceList, "2024-12-31");
+      expect(years).toEqual([{ key: "2024", label: "2024", total: 100 }]);
     });
 
-    test("год без расходов на ТО — среднее 0,00, без NaN/Infinity", () => {
-      const avg = averageServiceCostPerDay([], "2026", "2026-09-15");
+    test("не начинается раньше года первой записи ТО и не заканчивается раньше текущего", () => {
+      const { years } = serviceCostsByYear([service("2020-07-01", 1, 46)], "2026-09-15");
+      expect(years[0].key).toBe("2020");
+      expect(years[years.length - 1].key).toBe("2026");
+    });
+
+    test("без единой записи ТО — пусто, без NaN", () => {
+      expect(serviceCostsByYear([], "2026-09-15")).toEqual({ years: [], total: 0 });
+    });
+  });
+
+  describe("длительность в месяцах (monthsBetween)", () => {
+    test("полный календарный год — ровно 12, високосный тоже", () => {
+      expect(monthsBetween("2025-01-01", "2025-12-31")).toBeCloseTo(12, 9);
+      expect(monthsBetween("2024-01-01", "2024-12-31")).toBeCloseTo(12, 9);
+    });
+
+    test("текущий год до 15 сентября — 8 полных месяцев + 15/30 сентября", () => {
+      expect(monthsBetween("2026-01-01", "2026-09-15")).toBeCloseTo(8.5, 9);
+    });
+
+    test("неполные первый и последний месяцы считаются долями по дням", () => {
+      // 20/31 мая 2018 + июнь 2018 … август 2026 (99 полных) + 15/30 сентября 2026
+      expect(monthsBetween("2018-05-12", "2026-09-15")).toBeCloseTo(20 / 31 + 99 + 0.5, 9);
+    });
+
+    test("один и тот же месяц — доля месяца; один день — 1/дней в месяце", () => {
+      expect(monthsBetween("2026-02-01", "2026-02-28")).toBeCloseTo(1, 9);
+      expect(monthsBetween("2026-09-15", "2026-09-15")).toBeCloseTo(1 / 30, 9);
+    });
+
+    test("перевёрнутый или пустой диапазон — 0", () => {
+      expect(monthsBetween("2026-09-15", "2026-01-01")).toBe(0);
+      expect(monthsBetween(null, "2026-01-01")).toBe(0);
+    });
+  });
+
+  describe("среднее в месяц (averageServiceCostPerMonth)", () => {
+    test("завершённый год: сумма расходов / 12, а не с первой записи", () => {
+      const serviceList = [service("2025-07-10", 1, 600), service("2025-11-21", 2, 600)];
+      expect(averageServiceCostPerMonth(serviceList, "2025", "2026-09-15")).toBeCloseTo(100, 6);
+    });
+
+    test("високосный завершённый год — тоже / 12", () => {
+      expect(averageServiceCostPerMonth([service("2024-02-29", 1, 120)], "2024", "2026-09-15")).toBeCloseTo(10, 6);
+    });
+
+    test("текущий год: по прошедшей части года, текущий неполный месяц — долей по дням", () => {
+      const serviceList = [service("2026-03-05", 1, 425), service("2026-09-01", 2, 425)];
+      // 850 € / (8 полных месяцев + 15/30 сентября) = 850 / 8,5 = 100
+      expect(averageServiceCostPerMonth(serviceList, "2026", "2026-09-15")).toBeCloseTo(100, 6);
+    });
+
+    test("текущий год в январе — только доля января, без деления на 12", () => {
+      expect(averageServiceCostPerMonth([service("2026-01-10", 1, 50)], "2026", "2026-01-31")).toBeCloseTo(50, 6);
+    });
+
+    test("год без расходов на ТО — 0,00, без NaN/Infinity", () => {
+      const avg = averageServiceCostPerMonth([], "2026", "2026-09-15");
       expect(avg).toBe(0);
       expect(Number.isFinite(avg)).toBe(true);
+      expect(averageServiceCostPerMonth([], "2020", "2026-09-15")).toBe(0);
     });
 
-    test("«Все»: от точной даты первой записи ТО до сегодня", () => {
-      const serviceList = [service("2018-02-19", 1, 365)];
-      const avg = averageServiceCostPerDay(serviceList, "all", "2019-02-19");
-      // 365 € за ровно 365 дней (2018 — невисокосный)
-      expect(avg).toBeCloseTo(1, 6);
+    test("«Все»: от точной даты первой записи ТО до сегодня, крайние месяцы долями", () => {
+      const serviceList = [service("2018-05-12", 1, 1000)];
+      const months = 20 / 31 + 99 + 0.5;
+      expect(averageServiceCostPerMonth(serviceList, "all", "2026-09-15")).toBeCloseTo(1000 / months, 2);
     });
 
     test("«Все» без единой записи ТО — null, а не NaN/Infinity", () => {
-      const avg = averageServiceCostPerDay([], "all", "2026-09-15");
-      expect(avg).toBeNull();
+      expect(averageServiceCostPerMonth([], "all", "2026-09-15")).toBeNull();
     });
 
-    test("произвольный год без записей вообще — 0, а не null (год определён календарём)", () => {
-      const avg = averageServiceCostPerDay([], "2020", "2026-09-15");
-      expect(avg).toBe(0);
-      expect(Number.isFinite(avg)).toBe(true);
+    test("результат всегда конечное число или null — ни NaN, ни Infinity, ни Invalid Date", () => {
+      const cases = [
+        [[], "all", "2026-09-15"],
+        [[], "2026", "2026-09-15"],
+        [[service("2026-09-15", 1, 10)], "2026", "2026-09-15"],
+        [[service("2026-09-15", 1, 10)], "all", "2026-09-15"],
+        [[{ date: "2026-13-40", km: 1, cost: 10 }], "all", "2026-09-15"],
+      ];
+      cases.forEach(([list, period, today]) => {
+        const avg = averageServiceCostPerMonth(list, period, today);
+        expect(avg === null || Number.isFinite(avg)).toBe(true);
+      });
     });
   });
 });

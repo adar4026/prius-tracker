@@ -283,11 +283,11 @@ export function serviceMonthBounds(service, period, today = todayISO()) {
 }
 
 /**
- * Границы календарных дней для среднего расхода на ТО и ремонт в день —
+ * Границы календарных дней периода для карточки «Расходы на ТО и ремонт» —
  * тот же принцип, что у serviceMonthBounds, но по дням:
  *   год — 1 января — 31 декабря; для текущего года — по сегодня. Не зависит
- *         от наличия записей: год без единого ТО тоже даёт полный набор
- *         календарных дней (и 0 € в среднем), а не «нет данных».
+ *         от наличия записей: год без единого ТО тоже даёт полный период
+ *         (и 0 € в среднем), а не «нет данных».
  *   all — от точной даты первой записи ТО/ремонта (а не от первого числа её
  *         месяца) до сегодня. Записей ТО нет вовсе — диапазона нет (null).
  */
@@ -304,26 +304,85 @@ export function serviceDayBounds(service, period, today = todayISO()) {
   return { from, to };
 }
 
-/** Расходы на ТО и ремонт по месяцам выбранного периода — суммы из cost записей ТО. */
+/** Расходы на ТО и ремонт по месяцам выбранного года — суммы из cost записей ТО. */
 export function serviceCostsByMonth(service = [], period, today = todayISO()) {
   const serviceEntries = expenseEntries([], service);
   return expensesByMonth(serviceEntries, period, serviceMonthBounds(service, period, today));
 }
 
 /**
- * Средний расход на ТО и ремонт в день = сумма cost записей ТО за период /
- * число календарных дней диапазона (serviceDayBounds).
+ * Расходы на ТО и ремонт по календарным годам — для периода «Все», где
+ * десятки месячных столбцов за много лет читаются как сплошной разрыв.
+ * Каждый год от года первой записи ТО до текущего (или до года последней
+ * записи, если она датирована позже) присутствует; год без расходов — 0 €.
+ * Без единой записи ТО — пусто.
+ */
+export function serviceCostsByYear(service = [], today = todayISO()) {
+  const entries = expenseEntries([], service);
+  if (!entries.length) return { years: [], total: 0 };
+
+  const firstYear = Number(entries[0].date.slice(0, 4));
+  const lastEntryYear = Number(entries[entries.length - 1].date.slice(0, 4));
+  const lastYear = Math.max(Number(today.slice(0, 4)), lastEntryYear);
+
+  const sums = new Map();
+  entries.forEach((e) => {
+    if (e.amount === null || !Number.isFinite(e.amount)) return;
+    const key = e.date.slice(0, 4);
+    sums.set(key, (sums.get(key) || 0) + e.amount);
+  });
+
+  const years = [];
+  for (let y = firstYear; y <= lastYear; y++) {
+    const key = String(y);
+    years.push({ key, label: key, total: Math.round((sums.get(key) || 0) * 100) / 100 });
+  }
+  const total = Math.round(years.reduce((s, y) => s + y.total, 0) * 100) / 100;
+  return { years, total };
+}
+
+const daysInMonthOf = (iso) => {
+  const [y, m] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m, 0)).getUTCDate();
+};
+
+/**
+ * Длительность диапазона дат в месяцах, обе границы включительно. Неполные
+ * крайние месяцы считаются долей по календарным дням: 12.05.2018 — 15.09.2026
+ * = 20/31 мая + полные июнь 2018 … август 2026 + 15/30 сентября.
+ * Полный календарный год (1 января — 31 декабря) — ровно 12, високосный тоже.
+ */
+export function monthsBetween(fromISO, toISO) {
+  if (!fromISO || !toISO || fromISO > toISO) return 0;
+  const fromKey = monthKey(fromISO);
+  const toKey = monthKey(toISO);
+  const fromDay = Number(fromISO.slice(8, 10));
+  const toDay = Number(toISO.slice(8, 10));
+  if (fromKey === toKey) return (toDay - fromDay + 1) / daysInMonthOf(fromISO);
+
+  const head = (daysInMonthOf(fromISO) - fromDay + 1) / daysInMonthOf(fromISO);
+  const tail = toDay / daysInMonthOf(toISO);
+  const full = monthRange(shiftMonth(fromKey, 1), shiftMonth(toKey, -1)).length;
+  return head + full + tail;
+}
+
+/**
+ * Средний расход на ТО и ремонт в месяц = сумма cost записей ТО за период /
+ * длительность периода в месяцах (monthsBetween по serviceDayBounds):
+ * завершённый год — / 12; текущий год — по прошедшей части года, текущий
+ * неполный месяц входит долей по дням; «Все» — от точной даты первой записи
+ * ТО до сегодня, неполные первый и текущий месяцы тоже долями.
  * Диапазон не определён (period «all» без единой записи ТО) — null.
  */
-export function averageServiceCostPerDay(service = [], period, today = todayISO()) {
+export function averageServiceCostPerMonth(service = [], period, today = todayISO()) {
   const bounds = serviceDayBounds(service, period, today);
   if (!bounds) return null;
 
   const total = expenseEntries([], service)
     .filter((e) => inPeriod(e, period) && e.amount !== null && Number.isFinite(e.amount))
     .reduce((s, e) => s + e.amount, 0);
-  const days = daysBetween(bounds.from, bounds.to) + 1;
-  return days > 0 ? Math.round((total / days) * 100) / 100 : null;
+  const months = monthsBetween(bounds.from, bounds.to);
+  return months > 0 ? Math.round((total / months) * 100) / 100 : null;
 }
 
 /* ---------------- подписи осей ---------------- */
