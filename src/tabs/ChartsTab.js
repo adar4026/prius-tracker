@@ -11,7 +11,7 @@ import {
   MONTHS_SHORT, monthLabel, monthLabelFull, num, numOrNull,
 } from "../utils";
 import {
-  averageFuelCostPerMonth, averageServiceCostPerMonth, avgKmPerDay, filterPeriod,
+  averageFuelCostPerMonth, averageServiceCostPerMonth, avgKmPerDay, distanceDriven, filterPeriod,
   kmTicks, mileagePoints, monthTicks, monthlyFuelCosts, periodLabel, periodOptions,
   serviceCostsByMonth, serviceCostsByYear, timeTicks, tsToISO, withApproxConsumption,
 } from "../analytics";
@@ -35,10 +35,11 @@ const DAY_MS = 86400000;
 /**
  * Раздел «Графики»: переключатель режимов. У «Обзора» и «Затрат» — свой
  * период (overviewPeriod / costsPeriod), независимый друг от друга: смена
- * года в одном режиме не трогает другой. «Обзор» срезает заправки и записи
- * ТО (fuelP/serviceP) — по этому срезу считаются график расхода,
- * минимум/максимум и «Аналитика». «Цена» и «Месяцы» работают с исходными
- * списками и от периода не зависят. Выбор сохраняется при переключении режимов.
+ * года в одном режиме не трогает другой. Единственный фильтр «Обзора» срезает
+ * заправки и записи ТО (fuelP/serviceP) — по этому срезу считаются график
+ * расхода, минимум/максимум и оба блока «Пробега» (сводка и динамика
+ * одометра). «Цена» и «Месяцы» работают с исходными списками и от периода
+ * не зависят. Выбор сохраняется при переключении режимов.
  */
 export default function ChartsTab({ fuel, service, theme }) {
   const [mode, setMode] = useState("consumption");
@@ -69,7 +70,7 @@ export default function ChartsTab({ fuel, service, theme }) {
   const activeCostsPeriod = periodOpts.some((o) => o.id === costsPeriod) ? costsPeriod : "all";
   const costsPeriodText = periodLabel(activeCostsPeriod);
 
-  // срез по периоду для режима «Обзор» и его аналитики
+  // срез по периоду для режима «Обзор»: расход и пробег
   const fuelP = useMemo(() => filterPeriod(fuel, activeOverviewPeriod), [fuel, activeOverviewPeriod]);
   const serviceP = useMemo(() => filterPeriod(service, activeOverviewPeriod), [service, activeOverviewPeriod]);
 
@@ -184,7 +185,14 @@ export default function ChartsTab({ fuel, service, theme }) {
 
   /* ---------------- пробег ---------------- */
 
+  // точки одометра из заправок и записей ТО по общему срезу «Обзора»
   const mileage = useMemo(() => mileagePoints(fuelP, serviceP), [fuelP, serviceP]);
+  // график — показания одометра, показатель — пройдено за период:
+  // последняя точка периода − первая; по одной точке — «—»
+  const driven = useMemo(() => distanceDriven(mileage), [mileage]);
+  const drivenLabel = activeOverviewPeriod === "all"
+    ? "Пройдено за всё время"
+    : `Пройдено за ${activeOverviewPeriod} год`;
   const kmPerDay = useMemo(() => avgKmPerDay(mileage), [mileage]);
   const mileageAxis = useMemo(() => {
     if (!mileage.length) return { domain: [0, 1], y: kmTicks(NaN, NaN), ticks: [], format: () => "" };
@@ -212,7 +220,7 @@ export default function ChartsTab({ fuel, service, theme }) {
 
       {/* ---------- расход топлива ---------- */}
 
-      {/* период режима «Обзор»: график, минимум/максимум и аналитика ниже */}
+      {/* единственный период «Обзора»: график расхода, минимум/максимум и блок «Пробег» ниже */}
       {mode === "consumption" && (
         <div className="filter-row" style={{ paddingTop: 0 }}>
           <FilterMenu name="Период" title="Период" value={activeOverviewPeriod} options={periodOpts} onChange={setOverviewPeriod} />
@@ -554,19 +562,26 @@ export default function ChartsTab({ fuel, service, theme }) {
         </>
       )}
 
-      {/* ---------- аналитика («Пробег»): только в режиме «Обзор» ---------- */}
+      {/* ---------- «Пробег»: только в режиме «Обзор», по общему периоду ---------- */}
 
       {mode === "consumption" && (
         <>
-          <div className="section-title">Аналитика</div>
+          <div className="section-title">Пробег</div>
+          {/* сводка: пройдено за период и средний пробег в сутки */}
+          <div className="card stat">
+            <div className="stat__label">{drivenLabel}</div>
+            <div className="stat__value">
+              {driven === null ? "—" : fmtKm(driven)}
+              {driven !== null && <span className="stat__unit">км</span>}
+            </div>
+            <div className="stat__note">
+              В среднем в сутки: {kmPerDay === null ? "—" : `${fmtKm(kmPerDay)} км`}
+            </div>
+          </div>
+          {/* динамика одометра — отдельная карточка */}
           <div className="card chart-card">
             <div className="analytic__head">
-              <div className="hero__label">Пробег</div>
-              <div className="analytic__period">{overviewPeriodText}</div>
-            </div>
-            <div className="analytic__value">
-              В среднем в сутки:
-              <b>{kmPerDay === null ? "—" : `${fmtKm(kmPerDay)} км`}</b>
+              <div className="hero__label">Динамика пробега</div>
             </div>
             {mileage.length === 0 ? (
               <div className="analytic__empty">Нет записей с пробегом за период</div>
@@ -587,7 +602,7 @@ export default function ChartsTab({ fuel, service, theme }) {
                     contentStyle={tooltipStyle}
                     labelStyle={{ color: c.axis }}
                     labelFormatter={(ts) => fmtDate(tsToISO(ts))}
-                    formatter={(v) => [`${fmtKm(v)} км`, "Пробег"]}
+                    formatter={(v) => [`${fmtKm(v)} км`, "Одометр"]}
                   />
                   <Line
                     type="monotone" dataKey="km" stroke={c.teal} strokeWidth={2.4}

@@ -107,6 +107,22 @@ export function avgKmPerDay(points) {
   return Number.isFinite(value) ? value : null;
 }
 
+/**
+ * Пройдено за период по точкам одометра этого периода (mileagePoints по
+ * срезу filterPeriod): последний известный пробег − первый известный.
+ * Это километры, пройденные за отрезок, а не показание одометра: за 2025
+ * год — от первой записи 2025-го до последней записи 2025-го.
+ *
+ * Только реальные точки: ничего не интерполируется и точки соседних лет
+ * не подставляются. Меньше двух точек — null (показывается «—»): по одной
+ * записи пройденное расстояние неизвестно, а не 0.
+ */
+export function distanceDriven(points) {
+  if (!Array.isArray(points) || points.length < 2) return null;
+  const km = points[points.length - 1].km - points[0].km;
+  return Number.isFinite(km) && km >= 0 ? km : null;
+}
+
 /* ---------------- расходы по месяцам ---------------- */
 
 /**
@@ -409,11 +425,21 @@ export function kmTicks(minKm, maxKm, max = 6) {
   return { ticks, domain: [from, to === from ? from + step : to] };
 }
 
-/** Каждый n-й элемент, чтобы подписей было не больше max. */
+/**
+ * Каждый n-й элемент, чтобы подписей было не больше max, но последний
+ * элемент списка всегда остаётся: на графике пробега это самая свежая
+ * точка (текущий год/месяц), и её подпись не должна пропадать при
+ * прореживании. Если шаг и так задевает последний элемент — ничего
+ * не меняется; иначе последний прореженный элемент заменяется на него,
+ * чтобы не превысить max.
+ */
 const thin = (list, max) => {
   if (list.length <= max) return list;
   const step = Math.ceil(list.length / max);
-  return list.filter((_, i) => i % step === 0);
+  const out = list.filter((_, i) => i % step === 0);
+  const last = list[list.length - 1];
+  if (out[out.length - 1] === last) return out;
+  return out.length < max ? [...out, last] : [...out.slice(0, -1), last];
 };
 
 /**

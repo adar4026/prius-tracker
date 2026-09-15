@@ -1,13 +1,13 @@
 import {
   averageFuelCostPerMonth, averageServiceCostPerMonth, avgKmPerDay, daysBetween,
-  expenseEntries, filterPeriod, inPeriod, isValidISODate, kmTicks, mileagePoints,
+  distanceDriven, expenseEntries, filterPeriod, inPeriod, isValidISODate, kmTicks, mileagePoints,
   monthRange, monthTicks, monthlyExpenses, monthlyFuelCosts, monthsBetween,
   periodDayBounds, periodMonthBounds, periodOptions, RECONSTRUCTED_MONTHLY_CONSUMPTION,
   serviceCostsByMonth, serviceCostsByYear, serviceDayBounds, serviceMonthBounds,
   timeTicks, withApproxConsumption,
 } from "../analytics";
 import { INITIAL_FUEL, INITIAL_SERVICE } from "../data";
-import { HISTORY_IMPORTS, applyFuelBatch } from "../history";
+import { HISTORY_IMPORTS, applyFuelBatch, applyServiceBatch } from "../history";
 import { migrateFuel, migrateService, monthLabelFull } from "../utils";
 
 const fuel = (date, km, paidTotal = 40) => ({ id: km, date, km, paidTotal });
@@ -78,6 +78,63 @@ describe("средний пробег в сутки", () => {
     const points = mileagePoints([], [service("2018-02-19", 91714), service("2026-09-14", 221570)]);
     // 129 856 км за 3129 дней
     expect(avgKmPerDay(points)).toBe(42);
+  });
+});
+
+describe("пройдено за период", () => {
+  test("последний известный пробег − первый по точкам периода", () => {
+    const all = mileagePoints(
+      [fuel("2025-01-24", 176540), fuel("2025-12-27", 203631), fuel("2026-01-05", 204058)],
+      [service("2018-02-19", 91714)]
+    );
+    expect(distanceDriven(all)).toBe(204058 - 91714);
+    // год: только точки этого года, декабрьская точка прошлого года не подставляется
+    const y2026 = mileagePoints(filterPeriod([fuel("2026-01-05", 204058), fuel("2026-09-06", 220684), fuel("2025-12-27", 203631)], "2026"), []);
+    expect(distanceDriven(y2026)).toBe(16626);
+  });
+
+  test("одна точка или пусто — null, а не 0 и не NaN", () => {
+    expect(distanceDriven(mileagePoints([fuel("2019-05-06", 101803)], []))).toBeNull();
+    expect(distanceDriven([])).toBeNull();
+    expect(distanceDriven(null)).toBeNull();
+  });
+
+  test("запись ТО с неизвестным пробегом (0) точкой не становится и расчёт не ломает", () => {
+    const points = mileagePoints([fuel("2021-08-07", 124000)], [service("2021-02-19", 118856), service("2021-11-13", 0)]);
+    expect(distanceDriven(points)).toBe(5144);
+  });
+});
+
+describe("пробег: реальные данные Lexcar", () => {
+  let fuel = migrateFuel(INITIAL_FUEL);
+  let service = migrateService(INITIAL_SERVICE);
+  HISTORY_IMPORTS.forEach((batch) => {
+    const nextFuel = applyFuelBatch(fuel, batch, service);
+    const nextService = applyServiceBatch(service, batch, fuel);
+    fuel = nextFuel;
+    service = nextService;
+  });
+  const driven = (period) =>
+    distanceDriven(mileagePoints(filterPeriod(fuel, period), filterPeriod(service, period)));
+
+  test("годы фильтра берутся из записей: с 2018 по 2026", () => {
+    expect(periodOptions(fuel, service).map((o) => o.id)).toEqual([
+      "all", "2026", "2025", "2024", "2023", "2022", "2021", "2020", "2019", "2018",
+    ]);
+  });
+
+  test("всё время — от первого ТО 2018 года до последней записи", () => {
+    const points = mileagePoints(fuel, service);
+    expect(points[0]).toMatchObject({ date: "2018-02-19", km: 91714 });
+    expect(points[points.length - 1].km).toBe(Math.max(...fuel.map((f) => f.km), ...service.map((s) => s.km || 0)));
+    expect(driven("all")).toBe(221570 - 91714);
+  });
+
+  test("за год — между первой и последней записью этого года", () => {
+    expect(driven("2025")).toBe(203631 - 176540);
+    expect(driven("2026")).toBe(221570 - 204058);
+    // в 2020 году одна запись ТО — пройденный пробег неизвестен
+    expect(driven("2020")).toBeNull();
   });
 });
 
@@ -225,6 +282,15 @@ describe("подписи осей", () => {
 
     expect(timeTicks(NaN, 5).ticks).toEqual([]);
     expect(timeTicks(10, 5).ticks).toEqual([]);
+  });
+
+  test("прореживание подписей не роняет крайний год графика «Все»", () => {
+    // 2018-02-19 … 2026-09-14: последняя точка — актуальный ODO 2026 года,
+    // её подпись на оси должна остаться после прореживания до 6 делений
+    const years = timeTicks(Date.UTC(2018, 1, 19), Date.UTC(2026, 8, 14));
+    expect(years.ticks[years.ticks.length - 1]).toBe(Date.UTC(2026, 0, 1));
+    expect(years.ticks.length).toBeLessThanOrEqual(6);
+    expect(years.format(years.ticks[years.ticks.length - 1])).toBe("2026");
   });
 });
 
