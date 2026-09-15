@@ -368,8 +368,9 @@ describe("топливо: реальные данные Lexcar", () => {
     const { months, total, avgPerMonth } = monthlyFuelCosts(f, "all", "2026-09-15");
     expect(months[0].key).toBe("2025-06");
     expect(months).toHaveLength(16);
-    expect(total).toBeCloseTo(2542.42, 2);
-    expect(avgPerMonth).toBeCloseTo(2542.42 / 16, 2);
+    // 2542,42 по чекам минус 9,86 скидок осени 2025 из финансового журнала
+    expect(total).toBeCloseTo(2532.56, 2);
+    expect(avgPerMonth).toBeCloseTo(2532.56 / 16, 2);
     // 2018 год есть только в ТО — для топлива это «нет данных»
     expect(monthlyFuelCosts(f, "2018", "2026-09-15").months).toEqual([]);
   });

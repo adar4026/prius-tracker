@@ -155,6 +155,28 @@ const SERVICE_PATCHES = [
   },
 ];
 
+/* ---------------- сверка с финансовым журналом: осень 2025 ---------------- */
+// Старый журнал MyCar хранил сумму по чеку (gross), а в финансовом журнале
+// видно реально списанное — с учётом скидок на АЗС. Это те же заправки
+// (даты совпадают до дня), поэтому новых записей нет: у существующих
+// уточняется paidTotal, чек остаётся в grossTotal, разница уходит в discount.
+// Записи 13.06 (132,00 €) и 01.07 (128,50 €) из журнала — итоги месяца по
+// категории (в базе июнь 132,50 € и июль 128,80 € тремя заправками каждый),
+// как заправки они не добавляются. 08.08 (117,23 € против 40,00 €) — расхождение
+// не объяснено, запись не трогается.
+// `when` — защита от затирания: правка применяется, только если сумма в записи
+// всё ещё старая; отредактированная пользователем запись остаётся как есть.
+
+const FUEL_PATCHES_FIN_2025 = [
+  { match: { km: 195487 }, when: { paidTotal: 40.13 }, set: { paidTotal: 40.00, discount: 0.13 } },
+  // списано больше, чем стояло в чеке: 37,55 было ошибкой старого журнала, чек 38,00
+  { match: { km: 195757 }, when: { paidTotal: 37.55 }, set: { grossTotal: 38.00, paidTotal: 38.00, discount: 0 } },
+  { match: { km: 197451 }, when: { paidTotal: 40.00 }, set: { paidTotal: 37.57, discount: 2.43 } },
+  { match: { km: 197955 }, when: { paidTotal: 62.02 }, set: { paidTotal: 60.00, discount: 2.02 } },
+  { match: { km: 198722 }, when: { paidTotal: 25.84 }, set: { paidTotal: 21.63, discount: 4.21 } },
+  { match: { km: 199010 }, when: { paidTotal: 18.78 }, set: { paidTotal: 17.26, discount: 1.52 } },
+];
+
 const SERVICE_SPLITS = [
   {
     // две работы с разными интервалами следующей замены; сумма 215 € сохраняется
@@ -342,6 +364,10 @@ export const HISTORY_IMPORTS = [
     id: "oil-change-2026-09-14-close-stale",
     reminderCompletions: REMINDER_COMPLETIONS_2026_09_STALE,
   },
+  {
+    id: "fuel-fin-journal-2025-09-10",
+    fuelPatches: FUEL_PATCHES_FIN_2025,
+  },
 ];
 
 /* ---------------- слияние без дублей ---------------- */
@@ -406,12 +432,19 @@ const matchesService = (s, m) =>
   s.date === m.date &&
   String(s.type || "").toLowerCase().trim() === String(m.type || "").toLowerCase().trim();
 
-/** Заправки партии: сначала новые записи, затем точечные правки существующих. */
+/**
+ * Заправки партии: сначала новые записи, затем точечные правки существующих.
+ * Правка с `when` применяется только к записи, у которой перечисленные поля
+ * всё ещё равны ожидаемым: если пользователь уже поправил запись сам,
+ * миграция её не трогает.
+ */
 export function applyFuelBatch(list, batch) {
   let out = batch.fuel && batch.fuel.length ? mergeFuel(list, batch.fuel).list : list;
 
   (batch.fuelPatches || []).forEach((p) => {
-    out = out.map((f) => (f.km === p.match.km ? { ...f, ...p.set } : f));
+    const untouched = (f) =>
+      !p.when || Object.entries(p.when).every(([k, v]) => f[k] === v);
+    out = out.map((f) => (f.km === p.match.km && untouched(f) ? { ...f, ...p.set } : f));
   });
 
   // правки не трогают ни литры, ни пробег, поэтому расход пересчитывать не нужно

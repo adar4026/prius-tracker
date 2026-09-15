@@ -1,6 +1,7 @@
-import { INITIAL_REMINDERS, INITIAL_SERVICE } from "../data";
-import { HISTORY_IMPORTS, applyReminderBatch, applyServiceBatch } from "../history";
-import { fmtKm, migrateReminders, migrateService } from "../utils";
+import { INITIAL_FUEL, INITIAL_REMINDERS, INITIAL_SERVICE } from "../data";
+import { HISTORY_IMPORTS, applyFuelBatch, applyReminderBatch, applyServiceBatch } from "../history";
+import { monthlyFuelCosts } from "../analytics";
+import { fmtKm, migrateFuel, migrateReminders, migrateService } from "../utils";
 
 const batch = HISTORY_IMPORTS.find((b) => b.id === "oil-change-2026-09-14");
 const apply = (service, reminders) => {
@@ -152,5 +153,70 @@ describe("импорт замены масла 14.09.2026", () => {
     const own = { id: 99, title: "Своя задача", sourceServiceId: entry.id, completed: false };
     const reminders = applyReminderBatch([own], first.service, batch);
     expect(reminders.map((r) => r.id)).toEqual([99]);
+  });
+});
+
+describe("сверка заправок с финансовым журналом (осень 2025)", () => {
+  const FIN = HISTORY_IMPORTS.find((b) => b.id === "fuel-fin-journal-2025-09-10");
+  const before = HISTORY_IMPORTS.filter((b) => b !== FIN).reduce(applyFuelBatch, migrateFuel(INITIAL_FUEL));
+  const after = applyFuelBatch(before, FIN);
+  const y2025 = (list) => list.filter((f) => f.date.startsWith("2025"));
+  const total = (list) => Math.round(list.reduce((s, f) => s + (f.paidTotal || 0), 0) * 100) / 100;
+
+  test("новых заправок нет: 12 записей журнала — дубли и уточнения существующих", () => {
+    expect(y2025(after)).toHaveLength(29);
+    expect(y2025(after)).toHaveLength(y2025(before).length);
+    // итоги месяца из журнала (13.06 — 132,00 €, 01.07 — 128,50 €) заправками не стали
+    expect(after.some((f) => f.date === "2025-06-13" || f.date === "2025-07-01")).toBe(false);
+    // точные дубли остались одной записью
+    ["2025-09-03", "2025-09-13", "2025-09-21"].forEach((d) =>
+      expect(after.filter((f) => f.date === d)).toHaveLength(1)
+    );
+  });
+
+  test("paidTotal уточняется по списанию, чек остаётся в grossTotal, разница — в discount", () => {
+    const byKm = (km) => after.find((f) => f.km === km);
+    expect(byKm(195487)).toMatchObject({ date: "2025-09-06", grossTotal: 40.13, paidTotal: 40.00, discount: 0.13 });
+    expect(byKm(195757)).toMatchObject({ date: "2025-09-07", grossTotal: 38.00, paidTotal: 38.00, discount: 0 });
+    expect(byKm(197451)).toMatchObject({ date: "2025-09-27", grossTotal: 40.00, paidTotal: 37.57, discount: 2.43 });
+    expect(byKm(197955)).toMatchObject({ date: "2025-10-08", grossTotal: 62.02, paidTotal: 60.00, discount: 2.02 });
+    expect(byKm(198722)).toMatchObject({ date: "2025-10-19", grossTotal: 25.84, paidTotal: 21.63, discount: 4.21 });
+    expect(byKm(199010)).toMatchObject({ date: "2025-10-26", grossTotal: 18.78, paidTotal: 17.26, discount: 1.52 });
+    // 08.08 — расхождение не объяснено, запись не тронута
+    expect(after.find((f) => f.km === 192827)).toMatchObject({ paidTotal: 40, discount: 0 });
+    // литры, пробег и расход не менялись
+    after.forEach((f, i) => {
+      expect([f.km, f.liters, f.consumption]).toEqual([before[i].km, before[i].liters, before[i].consumption]);
+    });
+  });
+
+  test("контрольные суммы по месяцам из журнала: сентябрь 225,57 €, октябрь 98,89 €", () => {
+    const { months, total: t } = monthlyFuelCosts(after, "2025", "2026-09-15");
+    const m = Object.fromEntries(months.map((x) => [x.key, x.total]));
+    expect(m["2025-06"]).toBe(132.5);
+    expect(m["2025-07"]).toBe(128.8);
+    expect(m["2025-08"]).toBe(159.99);
+    expect(m["2025-09"]).toBe(225.57);
+    expect(m["2025-10"]).toBe(98.89);
+    expect(t).toBe(1160.89);
+    expect(total(y2025(after))).toBe(1160.89);
+    expect(total(y2025(before)) - total(y2025(after))).toBeCloseTo(9.86, 2);
+  });
+
+  test("данные 2026 года не меняются", () => {
+    const y26 = (list) => list.filter((f) => f.date.startsWith("2026"));
+    expect(y26(after)).toEqual(y26(before));
+  });
+
+  test("идемпотентность: повторное применение ничего не меняет", () => {
+    expect(applyFuelBatch(after, FIN)).toEqual(after);
+  });
+
+  test("запись, которую пользователь уже поправил сам, не затирается", () => {
+    const edited = before.map((f) => (f.km === 197955 ? { ...f, paidTotal: 55, discount: 7.02 } : f));
+    const out = applyFuelBatch(edited, FIN);
+    expect(out.find((f) => f.km === 197955)).toMatchObject({ paidTotal: 55, discount: 7.02 });
+    // остальные правки партии при этом применяются
+    expect(out.find((f) => f.km === 199010).paidTotal).toBe(17.26);
   });
 });
