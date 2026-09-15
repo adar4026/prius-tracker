@@ -369,8 +369,9 @@ describe("топливо: реальные данные Lexcar", () => {
     expect(months[0].key).toBe("2024-05");
     expect(months).toHaveLength(29);
     // 862,00 (2024, фин. журнал) + 2542,42 по чекам − 9,86 скидок осени 2025
-    expect(total).toBeCloseTo(3394.56, 2);
-    expect(avgPerMonth).toBeCloseTo(3394.56 / 29, 2);
+    // + 1,64 восстановленной суммы заправки 04.07.2026 (42,95 вместо 41,31)
+    expect(total).toBeCloseTo(3396.20, 2);
+    expect(avgPerMonth).toBeCloseTo(3396.20 / 29, 2);
     // январь–апрель 2025: данные уже ведутся, заправок нет — честные нули внутри диапазона
     expect(months.filter((m) => m.key >= "2025-01" && m.key <= "2025-05").every((m) => m.total === 0)).toBe(true);
     // 2018 год есть только в ТО — для топлива это «нет данных»

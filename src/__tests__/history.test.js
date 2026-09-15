@@ -437,3 +437,26 @@ describe("дворники 21.11.2024: пробег 170 000 → 175 200", () => 
     expect(wipers(applyServiceBatch(own, FIX, before.fuel)).km).toBe(175000);
   });
 });
+
+describe("заправка 04.07.2026: сумма и расход по скриншоту MyCar", () => {
+  const FIX = HISTORY_IMPORTS.find((b) => b.id === "fuel-2026-07-04-source-fix");
+  const before = HISTORY_IMPORTS.filter((b) => b !== FIX).reduce(
+    (acc, b) => applyFuelBatch(acc, b, []), migrateFuel(INITIAL_FUEL)
+  );
+  const after = applyFuelBatch(before, FIX, []);
+  const entry = (list) => list.find((f) => f.km === 217151);
+
+  test("сумма и расход берутся из источника, литры/цена/пробег не трогаются", () => {
+    expect(entry(before)).toMatchObject({ grossTotal: 41.31, paidTotal: 41.31, consumption: null });
+    expect(entry(after)).toEqual({
+      ...entry(before), grossTotal: 42.95, paidTotal: 42.95, consumption: 4.9,
+    });
+    expect(after.filter((f) => f !== entry(after))).toEqual(before.filter((f) => f !== entry(before)));
+  });
+
+  test("идемпотентно, а уже отредактированная пользователем запись не затирается", () => {
+    expect(applyFuelBatch(after, FIX, [])).toEqual(after);
+    const own = before.map((f) => (f === entry(before) ? { ...f, paidTotal: 45 } : f));
+    expect(entry(applyFuelBatch(own, FIX, []))).toMatchObject({ paidTotal: 45, consumption: null });
+  });
+});
