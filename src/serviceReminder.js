@@ -90,10 +90,51 @@ export const isOilChangeReminder = (r, service = []) => {
 };
 
 /**
+ * Задачи о моторном масле, которые замена `entry` делает неактуальными:
+ * активные, не созданные из этой же записи и со сроком, который наступает
+ * не позже самой замены либо не позже следующей запланированной
+ * (`next` — { dueKm, dueDate } задачи следующей замены). Без плана
+ * следующей замены устаревает любая такая задача со сроком. Сравнение идёт
+ * по любому из условий: задача, которая сработала бы раньше следующей
+ * замены, устарела. Задача без срока вовсе (например, заметка «купить
+ * масло») не закрывается — она нигде не считается просроченной.
+ *
+ * Именно этим правилом форма ТО закрывает прежние задачи при сохранении
+ * новой замены, и им же пользуются миграции — чтобы задача, которую
+ * пользователь правил или создал сам (другое название, другой срок),
+ * не пережила замену только потому, что не совпала с образцом дословно.
+ */
+export function staleOilReminders(reminders, service, entry, next = null) {
+  const limitKm = next?.dueKm ?? null;
+  const limitDate = next?.dueDate ?? null;
+  const unbounded = limitKm === null && limitDate === null;
+  const dueBefore = (r) =>
+    (r.dueKm &&
+      (unbounded || (entry.km && r.dueKm <= entry.km) || (limitKm !== null && r.dueKm <= limitKm))) ||
+    (r.dueDate &&
+      (unbounded || (entry.date && r.dueDate <= entry.date) || (limitDate !== null && r.dueDate <= limitDate)));
+  return reminders.filter(
+    (r) =>
+      !r.completed &&
+      r.sourceServiceId !== entry.id &&
+      isOilChangeReminder(r, service) &&
+      !!dueBefore(r)
+  );
+}
+
+/** Отметка «выполнено» записью ТО — единый вид для формы и миграций. */
+export const completedBy = (entry) => ({
+  completed: true,
+  completedDate: entry.date,
+  completedKm: entry.km,
+  completedServiceId: entry.id,
+});
+
+/**
  * Активная задача на следующую замену масла: в первую очередь созданная из
  * последней замены, иначе любая незакрытая задача про моторное масло.
  * Одновременно активной должна быть одна такая задача — форма ТО закрывает
- * прежние при сохранении новой замены.
+ * прежние при сохранении новой замены (см. staleOilReminders).
  */
 export function activeOilReminder(reminders, service) {
   const last = service

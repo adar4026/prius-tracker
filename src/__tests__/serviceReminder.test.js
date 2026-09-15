@@ -1,7 +1,7 @@
 import { fmtKm } from "../utils";
 import {
-  activeOilReminder, dueFromInterval, isOilChangeReminder, oilGradeOf,
-  plannedReminderFields, serviceReminderNote, serviceReminderTitle,
+  activeOilReminder, completedBy, dueFromInterval, isOilChangeReminder, oilGradeOf,
+  plannedReminderFields, serviceReminderNote, serviceReminderTitle, staleOilReminders,
 } from "../serviceReminder";
 
 const entry = {
@@ -65,5 +65,37 @@ describe("задача из записи ТО", () => {
     expect(activeOilReminder([old, linked], service)).toBe(linked);
     expect(activeOilReminder([old], service)).toBe(old);
     expect(activeOilReminder([{ ...old, completed: true }], service)).toBeNull();
+  });
+
+  test("устаревшие задачи о масле: старые сроки закрываются, чужие и будущие — нет", () => {
+    const service = [entry, { id: 23, date: "2026-02-19", km: 208188, category: "oil", type: "Масло 5W-30" }];
+    const next = { dueKm: 234570, dueDate: "2027-09-14" };
+    const edited = { id: 1, title: "Моторное масло 0W-20", completed: false, dueKm: 221600, dueDate: "2026-09-14" };
+    const linked = { id: 9, title: "Заменить моторное масло 0W-20", completed: false, sourceServiceId: 30, dueKm: 234570, dueDate: "2027-09-14" };
+    const dot4 = { id: 2, title: "Тормозная жидкость DOT4", completed: false, dueKm: 233000, dueDate: "2027-08-08" };
+    const cvt = { id: 3, title: "Масло вариатора", completed: false, dueKm: 225000 };
+    const noDue = { id: 4, title: "Купить моторное масло", completed: false, dueKm: null, dueDate: null };
+    const future = { id: 5, title: "Масло 0W-20 на 240 000", completed: false, dueKm: 240000, dueDate: "2028-01-01" };
+    const done = { id: 6, title: "Моторное масло 0W-20", completed: true, dueKm: 210000 };
+    const fromOlder = { id: 7, title: "Что угодно", completed: false, sourceServiceId: 23, dueKm: 223188 };
+
+    const all = [edited, linked, dot4, cvt, noDue, future, done, fromOlder];
+    expect(staleOilReminders(all, service, entry, next).map((r) => r.id)).toEqual([1, 7]);
+    // по дате раньше следующей замены — тоже устарела, даже если пробег позже
+    expect(staleOilReminders([{ ...future, dueDate: "2026-12-01" }], service, entry, next).map((r) => r.id))
+      .toEqual([5]);
+    // без плана следующей замены закрывается любая задача о масле со сроком
+    expect(staleOilReminders(all, service, entry, null).map((r) => r.id)).toEqual([1, 5, 7]);
+    // план только по пробегу: задача только с датой сверяется с датой самой замены
+    expect(staleOilReminders([edited], service, { ...entry, km: 221000 }, { dueKm: 234000 }).map((r) => r.id))
+      .toEqual([1]);
+    expect(staleOilReminders([{ ...edited, dueKm: null, dueDate: "2026-10-01" }], service, entry, { dueKm: 234570 }))
+      .toEqual([]);
+  });
+
+  test("отметка «выполнено» записью ТО", () => {
+    expect(completedBy(entry)).toEqual({
+      completed: true, completedDate: "2026-09-14", completedKm: 221570, completedServiceId: 30,
+    });
   });
 });

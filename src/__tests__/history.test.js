@@ -86,6 +86,57 @@ describe("импорт замены масла 14.09.2026", () => {
     expect(out[0]).toMatchObject({ dueKm: 231570, intervalKm: 10000, note: "моя" });
   });
 
+  test("закрытие устаревшей задачи на устройстве, где её правили вручную", () => {
+    const first = apply(INITIAL_SERVICE, INITIAL_REMINDERS);
+    const entry = first.service.find((s) => s.date === "2026-09-14" && s.category === "oil");
+    const closeStale = HISTORY_IMPORTS.find((b) => b.id === "oil-change-2026-09-14-close-stale");
+    // так задача выглядела на телефоне: пробег и дата поправлены вручную,
+    // название набрано заново (лишний пробел), партия по названию её не нашла
+    const edited = {
+      id: 1, title: "Моторное  масло 0W-20", icon: "🔧", dueKm: 221600, dueDate: "2026-09-14",
+      priority: "upcoming", note: "Замена моторного масла 0W-20", completed: false,
+    };
+    const planned = first.reminders.find((r) => r.sourceServiceId === entry.id);
+    const others = first.reminders.filter((r) => r.id !== 1 && r.id !== planned.id);
+    const before = migrateReminders([edited, ...others, planned]);
+
+    const out = applyReminderBatch(before, first.service, closeStale);
+    expect(out).toHaveLength(before.length);
+    expect(out.find((r) => r.id === 1)).toMatchObject({
+      completed: true, completedKm: 221570, completedDate: "2026-09-14", completedServiceId: entry.id,
+      dueKm: 221600, dueDate: "2026-09-14", title: "Моторное  масло 0W-20",
+    });
+    // задача следующей замены остаётся единственной активной задачей о масле
+    expect(out.filter((r) => !r.completed && r.title.includes("масло"))).toEqual([planned]);
+    expect(out.find((r) => r.sourceServiceId === entry.id)).toMatchObject({ completed: false, dueKm: 234570 });
+    // остальные задачи не тронуты
+    others.forEach((o) => expect(out.find((r) => r.id === o.id)).toEqual(before.find((r) => r.id === o.id)));
+    // запись ТО партия не меняет, повторное применение — без изменений
+    expect(applyServiceBatch(first.service, closeStale)).toEqual(first.service);
+    expect(applyReminderBatch(out, first.service, closeStale)).toBe(out);
+  });
+
+  test("закрытие устаревшей задачи: задача, возвращённая в работу после первой партии", () => {
+    const first = apply(INITIAL_SERVICE, INITIAL_REMINDERS);
+    const closeStale = HISTORY_IMPORTS.find((b) => b.id === "oil-change-2026-09-14-close-stale");
+    const reopened = first.reminders.map((r) =>
+      r.id === 1
+        ? { ...r, completed: false, completedDate: null, completedKm: null, completedServiceId: null, dueKm: 221600, dueDate: "2026-09-14" }
+        : r
+    );
+    const out = applyReminderBatch(reopened, first.service, closeStale);
+    expect(out.find((r) => r.id === 1)).toMatchObject({ completed: true, completedKm: 221570 });
+    expect(out.filter((r) => !r.completed)).toHaveLength(reopened.filter((r) => !r.completed).length - 1);
+  });
+
+  test("на чистой установке партия закрытия ничего не меняет — всё закрыто раньше", () => {
+    const { service, reminders } = apply(INITIAL_SERVICE, INITIAL_REMINDERS);
+    const closeStale = HISTORY_IMPORTS.find((b) => b.id === "oil-change-2026-09-14-close-stale");
+    expect(applyReminderBatch(reminders, service, closeStale)).toBe(reminders);
+    expect(reminders.filter((r) => r.completed).map((r) => r.id)).toEqual([1]);
+    expect(reminders.filter((r) => !r.completed)).toHaveLength(INITIAL_REMINDERS.length);
+  });
+
   test("повторное применение партии ничего не дублирует", () => {
     const first = apply(INITIAL_SERVICE, INITIAL_REMINDERS);
     const service = applyServiceBatch(first.service, batch);

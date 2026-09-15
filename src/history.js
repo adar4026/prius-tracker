@@ -14,7 +14,8 @@
 
 import { migrateFuel, migrateReminders, migrateService, nextId } from "./utils";
 import {
-  dueFromInterval, plannedReminderFields, serviceReminderNote,
+  completedBy, dueFromInterval, plannedReminderFields, serviceReminderNote,
+  staleOilReminders,
 } from "./serviceReminder";
 
 /* ---------------- заправки ---------------- */
@@ -289,6 +290,23 @@ const PLANNED_REMINDER_PATCHES_2026_09 = [
   },
 ];
 
+/**
+ * Закрытие старой задачи о масле там, где партия oil-change-2026-09-14 её
+ * не нашла. Та партия закрывала задачу по дословному названию «Моторное
+ * масло 0W-20» и применялась один раз: на устройстве, где задачу успели
+ * поправить вручную (221 600 км / 14.09.2026 вместо исходных
+ * 221 000 / 15.09.2026 — и, судя по всему, название тоже набрано заново)
+ * или вернуть в работу, совпадения не было, партия отметилась выполненной,
+ * и задача так и осталась активной и просроченной рядом с новой на
+ * 234 570 км. Здесь закрываются все устаревшие задачи о моторном масле
+ * по правилу формы ТО (staleOilReminders): активные, не созданные из этой
+ * замены и со сроком не позже следующей запланированной. Запись ТО и
+ * задача следующей замены не меняются, новых задач не создаётся.
+ */
+const REMINDER_COMPLETIONS_2026_09_STALE = [
+  { match: { staleOil: true }, by: OIL_SOURCE_2026_09 },
+];
+
 /** Разовые миграции истории. Каждая применяется не более одного раза. */
 export const HISTORY_IMPORTS = [
   {
@@ -319,6 +337,10 @@ export const HISTORY_IMPORTS = [
   {
     id: "oil-change-2026-09-14-interval-13000",
     plannedReminderPatches: PLANNED_REMINDER_PATCHES_2026_09,
+  },
+  {
+    id: "oil-change-2026-09-14-close-stale",
+    reminderCompletions: REMINDER_COMPLETIONS_2026_09_STALE,
   },
 ];
 
@@ -427,7 +449,9 @@ export function applyServiceBatch(list, batch) {
  * Задачи партии. Ссылаются на записи ТО по дате и виду работ, поэтому
  * применяются к уже долитому списку service.
  *   reminderCompletions — какие активные задачи закрывает запись ТО
- *     (по названию; уже выполненные не трогаются);
+ *     (уже выполненные не трогаются): match.title — по дословному названию,
+ *     match.staleOil — все устаревшие задачи о моторном масле по правилу
+ *     формы ТО (см. staleOilReminders), кроме созданной из самой записи;
  *   plannedReminders — задачи на следующую замену, посчитанные от записи
  *     интервалом, как это делает форма ТО. Если из записи задача уже создана
  *     (формой или прежним импортом), новая не добавляется;
@@ -441,17 +465,14 @@ export function applyReminderBatch(list, service, batch) {
   (batch.reminderCompletions || []).forEach((c) => {
     const entry = service.find((s) => matchesService(s, c.by));
     if (!entry) return;
-    out = out.map((r) =>
-      !r.completed && r.title === c.match.title
-        ? {
-            ...r,
-            completed: true,
-            completedDate: entry.date,
-            completedKm: entry.km,
-            completedServiceId: entry.id,
-          }
-        : r
-    );
+    const stale = c.match.staleOil
+      ? staleOilReminders(
+          out, service, entry,
+          out.find((r) => !r.completed && r.sourceServiceId === entry.id) || null
+        )
+      : out.filter((r) => !r.completed && r.title === c.match.title);
+    if (!stale.length) return;
+    out = out.map((r) => (stale.includes(r) ? { ...r, ...completedBy(entry) } : r));
   });
 
   (batch.plannedReminders || []).forEach((p) => {

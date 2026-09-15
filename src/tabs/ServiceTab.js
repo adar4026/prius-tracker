@@ -7,7 +7,7 @@ import NextServiceFields from "../components/NextServiceFields";
 import useFocusEntry from "../components/useFocusEntry";
 import { CATEGORY_COLORS, CATEGORY_LABELS, OIL_INTERVAL_DEFAULTS } from "../data";
 import {
-  isOilChangeReminder, plannedReminderFields, serviceReminderNote,
+  completedBy, plannedReminderFields, serviceReminderNote, staleOilReminders,
 } from "../serviceReminder";
 import {
   addMonths, byDateDesc, costBreakdownLabel, elapsedLabel, entryYear, fmtDate,
@@ -255,10 +255,10 @@ export default function ServiceTab({
    * своё «выполнено» не теряет. Выключенный план удаляет только незакрытую
    * задачу — историю выполненных не трогаем.
    *
-   * Новая замена масла закрывает все прежние активные задачи про моторное
-   * масло, а не только ту, из которой нажали «Выполнить»: одновременно
-   * активна одна задача следующей замены. Правка старой записи ничего не
-   * закрывает.
+   * Новая замена масла закрывает прежние активные задачи про моторное
+   * масло (staleOilReminders), а не только ту, из которой нажали
+   * «Выполнить»: одновременно активна одна задача следующей замены.
+   * Правка старой записи ничего не закрывает.
    */
   const syncReminder = (entry, { nextKm, nextDate }) => {
     const linked = linkedReminder(reminders, entry.id);
@@ -269,17 +269,10 @@ export default function ServiceTab({
       let out = list;
 
       if (closesOil) {
-        out = out.map((r) =>
-          !r.completed && r.sourceServiceId !== entry.id && isOilChangeReminder(r, service)
-            ? {
-                ...r,
-                completed: true,
-                completedDate: entry.date,
-                completedKm: entry.km,
-                completedServiceId: entry.id,
-              }
-            : r
+        const stale = staleOilReminders(
+          out, service, entry, form.planNext ? { dueKm: nextKm, dueDate: nextDate } : null
         );
+        out = out.map((r) => (stale.includes(r) ? { ...r, ...completedBy(entry) } : r));
       }
 
       if (form.planNext) {
@@ -328,17 +321,7 @@ export default function ServiceTab({
 
       // запись создана кнопкой «Выполнить» — закрываем исходную задачу
       if (closing) {
-        out = out.map((r) =>
-          r.id === closing
-            ? {
-                ...r,
-                completed: true,
-                completedDate: entry.date,
-                completedKm: entry.km,
-                completedServiceId: entry.id,
-              }
-            : r
-        );
+        out = out.map((r) => (r.id === closing ? { ...r, ...completedBy(entry) } : r));
       }
       return out;
     });
