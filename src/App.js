@@ -76,10 +76,18 @@ export default function App() {
     );
     if (!pending.length) return;
 
-    setFuel((prev) => pending.reduce(applyFuelBatch, prev));
+    // заправки и ТО идут через партии вместе: восстановление пробега берёт
+    // опорные точки из обеих коллекций
+    const { fuel: nextFuel, service: nextService } = pending.reduce(
+      (acc, batch) => ({
+        fuel: applyFuelBatch(acc.fuel, batch, acc.service),
+        service: applyServiceBatch(acc.service, batch, acc.fuel),
+      }),
+      { fuel, service }
+    );
+    setFuel(nextFuel);
     // задачи партии ссылаются на записи ТО по дате и виду работ, поэтому
     // применяются к уже долитому списку
-    const nextService = pending.reduce(applyServiceBatch, service);
     setService(nextService);
     setReminders((prev) =>
       pending.reduce((acc, batch) => applyReminderBatch(acc, nextService, batch), prev)

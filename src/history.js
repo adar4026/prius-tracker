@@ -13,6 +13,7 @@
 //     запрещает две заправки с одинаковым km), для ТО — дата + вид работ.
 
 import { migrateFuel, migrateReminders, migrateService, nextId, numOrNull } from "./utils";
+import { daysBetween, isValidISODate, mileagePoints } from "./analytics";
 import {
   completedBy, dueFromInterval, plannedReminderFields, serviceReminderNote,
   staleOilReminders,
@@ -182,6 +183,111 @@ const FUEL_2024 = [
 //   04.06 масло 62,79 € — в базе замена 08.06 на 50 € (lubricantesweb.es):
 //     похоже, тот же заказ, но дата и сумма расходятся — не трогается;
 //   21.11 дворники 17,71 € — в базе те же дворники на 20 € — не трогается.
+
+/* ---------------- восстановление пробега по опорным точкам ---------------- */
+// Записям без одометра (заправки 2024 по финансовому журналу, покупки
+// запчастей, страховка) пробег восстанавливается линейной интерполяцией по
+// датам между ближайшими реальными показаниями: подтверждённые точки из
+// истории автомобиля ниже плюс все реальные значения km, уже записанные в
+// базе (через mileagePoints — он же отбрасывает откаты одометра назад).
+// Результат округляется до 10 км и не выходит за соседние точки. Запись
+// с уже известным пробегом не трогается; запись до первой или после
+// последней точки остаётся без пробега — среднее по автомобилю не применяется.
+// Восстановленный пробег — рабочее историческое значение для журнала и
+// графика пробега; расход и цену за литр он не даёт: литров у записи нет.
+
+export const ODOMETER_ANCHORS = [
+  { date:"2016-05-23", km:80472 },
+  { date:"2018-02-19", km:91714 },
+  { date:"2018-05-18", km:93427 },
+  { date:"2019-05-06", km:101803 },
+  { date:"2019-11-21", km:106500 },
+  { date:"2019-11-27", km:106700 },
+  { date:"2019-11-30", km:107000 },
+  { date:"2019-12-13", km:107600 },
+  { date:"2020-02-12", km:110100 },
+  { date:"2020-02-13", km:110105 },
+  { date:"2020-05-29", km:111655 },
+  { date:"2020-07-09", km:112251 },
+  { date:"2020-08-11", km:113375 },
+  { date:"2020-10-28", km:115500 },
+  { date:"2020-10-29", km:115500 },
+  { date:"2021-02-19", km:118856 },
+  { date:"2021-08-07", km:124000 },
+  { date:"2022-01-14", km:128277 },
+  { date:"2022-05-20", km:132000 },
+  { date:"2022-09-01", km:135790 },
+  { date:"2023-09-21", km:151500 },
+  { date:"2024-01-18", km:155347 },
+  { date:"2024-01-25", km:155870 },
+  { date:"2024-04-05", km:160000 },
+  { date:"2024-06-08", km:164700 },
+  { date:"2024-09-25", km:174000 },
+  { date:"2025-01-24", km:176540 },
+  { date:"2025-02-14", km:178000 },
+  { date:"2025-03-25", km:180000 },
+  { date:"2025-04-01", km:182029 },
+  { date:"2025-08-08", km:192820 },
+  { date:"2025-09-10", km:196113 },
+  { date:"2025-09-18", km:196845 },
+  { date:"2026-02-19", km:208188 },
+];
+
+/**
+ * Опорные точки одометра: подтверждённые из истории автомобиля плюс реальные
+ * показания из базы. Отсортированы по дате (внутри дня — по пробегу),
+ * без дублей, монотонны: точка ниже уже достигнутого пробега отбрасывается.
+ */
+export function odometerAnchors(fuel = [], service = [], confirmed = ODOMETER_ANCHORS) {
+  const raw = [
+    ...confirmed,
+    ...mileagePoints(fuel, service).map((p) => ({ date: p.date, km: p.km })),
+  ].sort((a, b) => a.date.localeCompare(b.date) || a.km - b.km);
+  const out = [];
+  let max = -Infinity;
+  raw.forEach((p) => {
+    if (p.km < max) return;
+    const last = out[out.length - 1];
+    if (last && last.date === p.date && last.km === p.km) return;
+    max = p.km;
+    out.push(p);
+  });
+  return out;
+}
+
+/**
+ * Пробег на дату между ближайшими опорными точками:
+ *   km = kmBefore + (kmAfter − kmBefore) × прошло дней / всего дней,
+ * округлённый до 10 км и зажатый между соседними точками. Точка в тот же
+ * день — её пробег (при нескольких — наименьший). Вне диапазона точек — null.
+ */
+export function interpolateKm(anchors, date) {
+  const sameDay = anchors.find((a) => a.date === date);
+  if (sameDay) return sameDay.km;
+  let before = null;
+  let after = null;
+  for (const a of anchors) {
+    if (a.date < date) before = a;
+    else if (!after) after = a;
+  }
+  if (!before || !after) return null;
+  const total = daysBetween(before.date, after.date);
+  const elapsed = daysBetween(before.date, date);
+  const raw = before.km + ((after.km - before.km) * elapsed) / total;
+  const rounded = Math.round(raw / 10) * 10;
+  return Math.min(after.km, Math.max(before.km, rounded));
+}
+
+/** Заполняет пробег только у записей, где он неизвестен (null / 0). */
+export function fillMissingKm(list, anchors) {
+  return list.map((e) => {
+    if (!e || !isValidISODate(e.date)) return e;
+    const known = numOrNull(e.km);
+    if (known !== null && known > 0) return e;
+    const km = interpolateKm(anchors, e.date);
+    return km === null ? e : { ...e, km };
+  });
+}
 
 /* ---------------- сверка с финансовым журналом: осень 2025 ---------------- */
 // Старый журнал MyCar хранил сумму по чеку (gross), а в финансовом журнале
@@ -400,6 +506,10 @@ export const HISTORY_IMPORTS = [
     id: "fuel-fin-journal-2024",
     fuel: FUEL_2024,
   },
+  {
+    id: "odometer-fill-2024",
+    kmFill: true,
+  },
 ];
 
 /* ---------------- слияние без дублей ---------------- */
@@ -473,12 +583,14 @@ const matchesService = (s, m) =>
   String(s.type || "").toLowerCase().trim() === String(m.type || "").toLowerCase().trim();
 
 /**
- * Заправки партии: сначала новые записи, затем точечные правки существующих.
+ * Заправки партии: сначала новые записи, затем точечные правки существующих,
+ * затем восстановление пробега (kmFill) по опорным точкам — для них нужны и
+ * записи ТО, поэтому они передаются третьим аргументом.
  * Правка с `when` применяется только к записи, у которой перечисленные поля
  * всё ещё равны ожидаемым: если пользователь уже поправил запись сам,
  * миграция её не трогает.
  */
-export function applyFuelBatch(list, batch) {
+export function applyFuelBatch(list, batch, service = []) {
   let out = batch.fuel && batch.fuel.length ? mergeFuel(list, batch.fuel).list : list;
 
   (batch.fuelPatches || []).forEach((p) => {
@@ -487,7 +599,11 @@ export function applyFuelBatch(list, batch) {
     out = out.map((f) => (f.km === p.match.km && untouched(f) ? { ...f, ...p.set } : f));
   });
 
-  // правки не трогают ни литры, ни пробег, поэтому расход пересчитывать не нужно
+  if (batch.kmFill) {
+    out = fillMissingKm(out, odometerAnchors(out, Array.isArray(service) ? service : []));
+  }
+
+  // правки не трогают литры и не меняют известный пробег, расход пересчитывать не нужно
   return out;
 }
 
@@ -496,8 +612,12 @@ export function applyFuelBatch(list, batch) {
  * событий. Разделение именно заменяет исходную запись, а не добавляется
  * поверх неё, — иначе сумма события удвоилась бы.
  */
-export function applyServiceBatch(list, batch) {
+export function applyServiceBatch(list, batch, fuel = []) {
   let out = batch.service && batch.service.length ? mergeService(list, batch.service).list : list;
+
+  if (batch.kmFill) {
+    out = fillMissingKm(out, odometerAnchors(Array.isArray(fuel) ? fuel : [], out));
+  }
 
   (batch.servicePatches || []).forEach((p) => {
     out = out.map((s) => (matchesService(s, p.match) ? { ...s, ...p.set } : s));
