@@ -8,7 +8,7 @@ import FilterMenu from "../components/FilterMenu";
 import { chartColors } from "../themes";
 import {
   avg, byKmAsc, consumptionPoints, fmtDate, fmtKm, fmtMoney, fmtNum, isFull,
-  monthLabel, num, numOrNull,
+  MONTHS_SHORT, monthLabel, monthLabelFull, num, numOrNull,
 } from "../utils";
 import {
   averageFuelCostPerMonth, averageServiceCostPerDay, avgKmPerDay, filterPeriod,
@@ -154,19 +154,22 @@ export default function ChartsTab({ fuel, service, theme }) {
     [fuel, activeCostsPeriod]
   );
 
-  // ежедневные затраты на ТО и ремонт: крупный показатель — среднее в день,
-  // график — по месяцам, чтобы не строить сотни пустых дневных столбцов
+  // расходы на ТО и ремонт: крупный показатель — среднее в день, график —
+  // по месяцам, непрерывным рядом (пустой месяц — 0 €, а не пропуск)
   const serviceMonthly = useMemo(
-    () => serviceCostsByMonth(fuel, service, activeCostsPeriod),
-    [fuel, service, activeCostsPeriod]
+    () => serviceCostsByMonth(service, activeCostsPeriod),
+    [service, activeCostsPeriod]
   );
-  const serviceMonthlyAxis = useMemo(
-    () => monthTicks(serviceMonthly.months.map((m) => m.key)),
-    [serviceMonthly]
-  );
+  // для периода в один год подписи — голые короткие месяцы («янв»),
+  // для «Все» (может охватывать несколько лет) — с годом, как у топлива
+  const serviceMonthlyAxis = useMemo(() => {
+    const t = monthTicks(serviceMonthly.months.map((m) => m.key));
+    if (activeCostsPeriod === "all") return t;
+    return { ...t, format: (k) => MONTHS_SHORT[Number(k.slice(5, 7)) - 1] };
+  }, [serviceMonthly, activeCostsPeriod]);
   const avgServicePerDay = useMemo(
-    () => averageServiceCostPerDay(fuel, service, activeCostsPeriod),
-    [fuel, service, activeCostsPeriod]
+    () => averageServiceCostPerDay(service, activeCostsPeriod),
+    [service, activeCostsPeriod]
   );
 
   /* ---------------- пробег ---------------- */
@@ -469,16 +472,16 @@ export default function ChartsTab({ fuel, service, theme }) {
         </div>
       )}
 
-      {/* ---------- ежедневные затраты: ТО и ремонт ---------- */}
+      {/* ---------- расходы на ТО и ремонт ---------- */}
 
       {mode === "costs" && (
         <div className="card chart-card" style={{ marginTop: 10 }}>
           <div className="analytic__head">
-            <div className="hero__label">Ежедневные затраты</div>
+            <div className="hero__label">Расходы на ТО и ремонт</div>
             <div className="analytic__period">{costsPeriodText}</div>
           </div>
           <div className="analytic__value">
-            ТО и ремонт — в среднем в день:
+            В среднем в день:
             <b>{fmtMoney(avgServicePerDay)}</b>
           </div>
           {serviceMonthly.months.length === 0 ? (
@@ -496,7 +499,7 @@ export default function ChartsTab({ fuel, service, theme }) {
                   cursor={{ fill: c.grid, opacity: 0.35 }}
                   contentStyle={tooltipStyle}
                   labelStyle={{ color: c.axis }}
-                  labelFormatter={(key) => monthLabel(`${key}-01`)}
+                  labelFormatter={(key) => monthLabelFull(`${key}-01`)}
                   formatter={(v) => [fmtMoney(v), "ТО и ремонт"]}
                 />
                 <Bar dataKey="total" fill={c.blue} radius={[3, 3, 0, 0]} isAnimationActive={false} />

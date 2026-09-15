@@ -255,21 +255,68 @@ export function averageFuelCostPerMonth(fuel, period, today = todayISO()) {
   return monthlyFuelCosts(fuel, period, today).avgPerMonth;
 }
 
+/** Месяц самой ранней записи ТО/ремонта с достоверной датой — null, если записей нет вовсе. */
+function firstServiceMonth(service) {
+  const dated = expenseEntries([], service).map((e) => monthKey(e.date));
+  return dated.length ? dated.reduce((a, b) => (a < b ? a : b)) : null;
+}
+
+/**
+ * Границы месяцев для карточки «Расходы на ТО и ремонт» (вкладка «Затраты»):
+ *   год — с января по декабрь; для текущего года — по текущий месяц, будущие
+ *         месяцы не входят. Диапазон не зависит от того, есть ли в нём записи
+ *         ТО — год без единого ремонта всё равно раскладывается по всем своим
+ *         месяцам нулями, а не пропадает.
+ *   all — от месяца первой реальной записи ТО/ремонта (не заправки) до
+ *         текущего месяца. Нет ни одной записи ТО — диапазона нет (null).
+ */
+export function serviceMonthBounds(service, period, today = todayISO()) {
+  const current = monthKey(today);
+  if (period === "all") {
+    const first = firstServiceMonth(service);
+    return first ? { from: first, to: first > current ? first : current } : null;
+  }
+  const from = `${period}-01`;
+  const dec = `${period}-12`;
+  const to = current < dec && current >= from ? current : dec;
+  return { from, to };
+}
+
+/**
+ * Границы календарных дней для среднего расхода на ТО и ремонт в день —
+ * тот же принцип, что у serviceMonthBounds, но по дням:
+ *   год — 1 января — 31 декабря; для текущего года — по сегодня. Не зависит
+ *         от наличия записей: год без единого ТО тоже даёт полный набор
+ *         календарных дней (и 0 € в среднем), а не «нет данных».
+ *   all — от точной даты первой записи ТО/ремонта (а не от первого числа её
+ *         месяца) до сегодня. Записей ТО нет вовсе — диапазона нет (null).
+ */
+export function serviceDayBounds(service, period, today = todayISO()) {
+  if (period === "all") {
+    const dated = expenseEntries([], service).map((e) => e.date);
+    if (!dated.length) return null;
+    const first = dated.reduce((a, b) => (a < b ? a : b));
+    return { from: first, to: first > today ? first : today };
+  }
+  const from = `${period}-01-01`;
+  const dec31 = `${period}-12-31`;
+  const to = today < dec31 && today >= from ? today : dec31;
+  return { from, to };
+}
+
 /** Расходы на ТО и ремонт по месяцам выбранного периода — суммы из cost записей ТО. */
-export function serviceCostsByMonth(fuel = [], service = [], period, today = todayISO()) {
-  const boundsEntries = expenseEntries(fuel, service);
+export function serviceCostsByMonth(service = [], period, today = todayISO()) {
   const serviceEntries = expenseEntries([], service);
-  return monthlyExpenses(serviceEntries, period, today, boundsEntries);
+  return expensesByMonth(serviceEntries, period, serviceMonthBounds(service, period, today));
 }
 
 /**
  * Средний расход на ТО и ремонт в день = сумма cost записей ТО за период /
- * число календарных дней диапазона (periodDayBounds, по всей истории).
- * Без записей за период (ни заправок, ни ТО) — null.
+ * число календарных дней диапазона (serviceDayBounds).
+ * Диапазон не определён (period «all» без единой записи ТО) — null.
  */
-export function averageServiceCostPerDay(fuel = [], service = [], period, today = todayISO()) {
-  const boundsEntries = expenseEntries(fuel, service);
-  const bounds = periodDayBounds(boundsEntries, period, today);
+export function averageServiceCostPerDay(service = [], period, today = todayISO()) {
+  const bounds = serviceDayBounds(service, period, today);
   if (!bounds) return null;
 
   const total = expenseEntries([], service)

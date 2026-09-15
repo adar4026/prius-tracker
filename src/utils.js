@@ -61,10 +61,18 @@ export const fmtDate = (iso) => {
 
 export const MONTHS_SHORT = ["янв","фев","мар","апр","май","июн","июл","авг","сен","окт","ноя","дек"];
 
+export const MONTHS_FULL = [
+  "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+  "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
+];
+
 export const monthLabel = (iso) => {
   const [y, m] = iso.split("-");
   return `${MONTHS_SHORT[Number(m) - 1]} ${y.slice(2)}`;
 };
+
+// «Март» — полное название месяца для тултипов, без года
+export const monthLabelFull = (iso) => MONTHS_FULL[Number(iso.slice(5, 7)) - 1];
 
 export const todayISO = () => new Date().toISOString().slice(0, 10);
 
