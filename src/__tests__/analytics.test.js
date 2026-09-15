@@ -2,7 +2,8 @@ import {
   averageFuelCostPerMonth, averageServiceCostPerDay, avgKmPerDay, daysBetween,
   expenseEntries, filterPeriod, inPeriod, isValidISODate, kmTicks, mileagePoints,
   monthRange, monthTicks, monthlyExpenses, monthlyFuelCosts, periodDayBounds,
-  periodMonthBounds, periodOptions, serviceCostsByMonth, timeTicks,
+  periodMonthBounds, periodOptions, RECONSTRUCTED_MONTHLY_CONSUMPTION,
+  serviceCostsByMonth, timeTicks, withApproxConsumption,
 } from "../analytics";
 import { INITIAL_FUEL, INITIAL_SERVICE } from "../data";
 import { HISTORY_IMPORTS, applyFuelBatch } from "../history";
@@ -415,5 +416,56 @@ describe("ежедневные затраты на ТО и ремонт (вкл�
     const avg = averageServiceCostPerDay([], serviceList, "all", "2019-02-19");
     // 365 € за ровно 365 дней (2018 — невисокосный)
     expect(avg).toBeCloseTo(1, 6);
+  });
+});
+
+describe("приблизительный расход июнь 2025 — февраль 2026", () => {
+  const months = (key, avgCons) => ({ key, label: key, spent: 0, liters: 0, fills: 1, cons: [], avgCons });
+
+  test("реальный расход не трогается — approxCons null, isApprox false, consDisplay = avgCons", () => {
+    const [m] = withApproxConsumption([months("2026-03", 5.5)]);
+    expect(m).toMatchObject({ avgCons: 5.5, approxCons: null, consDisplay: 5.5, isApprox: false });
+  });
+
+  test("месяц без реального расхода, но со значением реконструкции — approxCons/consDisplay берутся из карты", () => {
+    const [m] = withApproxConsumption([months("2025-06", null)]);
+    expect(m).toMatchObject({
+      avgCons: null, approxCons: RECONSTRUCTED_MONTHLY_CONSUMPTION["2025-06"],
+      consDisplay: RECONSTRUCTED_MONTHLY_CONSUMPTION["2025-06"], isApprox: true,
+    });
+  });
+
+  test("месяц без реального расхода и вне карты реконструкции остаётся пустым, а не выдуманным", () => {
+    const [m] = withApproxConsumption([months("2025-03", null)]);
+    expect(m).toMatchObject({ avgCons: null, approxCons: null, consDisplay: null, isApprox: false });
+  });
+
+  test("реальное значение всегда побеждает реконструкцию, даже если месяц есть в обеих", () => {
+    // сам список реконструкции не пересекается с месяцами, где есть реальный расход,
+    // но inputs с обоими значениями не должны переключаться на approx
+    const [m] = withApproxConsumption([months("2025-06", 3.0)]);
+    expect(m).toMatchObject({ avgCons: 3.0, approxCons: null, consDisplay: 3.0, isApprox: false });
+  });
+
+  test("непрерывность: июнь 2025 — февраль 2026 заполнены реконструкцией, март 2026 — реальным расходом", () => {
+    const keys = [
+      "2025-06", "2025-07", "2025-08", "2025-09", "2025-10", "2025-11",
+      "2025-12", "2026-01", "2026-02",
+    ];
+    const input = [...keys.map((k) => months(k, null)), months("2026-03", 5.5)];
+    const out = withApproxConsumption(input);
+    expect(out.filter((m) => m.consDisplay === null)).toHaveLength(0);
+    expect(keys.every((k) => out.find((m) => m.key === k).isApprox)).toBe(true);
+    expect(out.find((m) => m.key === "2026-03")).toMatchObject({ isApprox: false, consDisplay: 5.5 });
+  });
+
+  test("значения реконструкции и их среднее совпадают с восстановленными по литрам/пробегу", () => {
+    const values = Object.values(RECONSTRUCTED_MONTHLY_CONSUMPTION);
+    expect(RECONSTRUCTED_MONTHLY_CONSUMPTION).toEqual({
+      "2025-06": 4.45, "2025-07": 4.30, "2025-08": 5.42, "2025-09": 5.04, "2025-10": 3.96,
+      "2025-11": 5.44, "2025-12": 5.51, "2026-01": 4.39, "2026-02": 4.89,
+    });
+    const avg = values.reduce((s, v) => s + v, 0) / values.length;
+    expect(avg).toBeCloseTo(4.82, 2);
   });
 });

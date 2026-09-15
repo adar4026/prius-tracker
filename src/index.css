@@ -895,6 +895,9 @@ html[data-theme="light"] .filter-btn--active {
 }
 .chart-legend span { display: flex; align-items: center; gap: 5px; }
 .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+/* приблизительное (не подтверждённое) значение на графике — тот же цвет, но
+   бледнее и с пунктирной обводкой вместо сплошной заливки */
+.dot--approx { background: transparent; border: 1.5px dashed; opacity: 0.7; }
 
 /* ---------- аналитические карточки («Пробег», «Ежемесячные затраты») ---------- */
 

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import {
-  Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine,
+  Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ReferenceLine,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import Stat from "../components/Stat";
@@ -13,7 +13,7 @@ import {
 import {
   averageFuelCostPerMonth, averageServiceCostPerDay, avgKmPerDay, filterPeriod,
   kmTicks, mileagePoints, monthTicks, monthlyFuelCosts, periodLabel, periodOptions,
-  serviceCostsByMonth, timeTicks, tsToISO,
+  serviceCostsByMonth, timeTicks, tsToISO, withApproxConsumption,
 } from "../analytics";
 
 const MODES = [
@@ -118,12 +118,16 @@ export default function ChartsTab({ fuel, service, theme }) {
       m.fills += 1;
       if (isFull(f) && Number.isFinite(f.consumption) && f.consumption > 0) m.cons.push(f.consumption);
     });
-    return [...map.values()]
+    const withReal = [...map.values()]
       .sort((a, b) => a.key.localeCompare(b.key))
       .map((m) => ({ ...m, avgCons: m.cons.length ? avg(m.cons) : null }));
+    // approxCons/consDisplay/isApprox — только для отрисовки графика расхода,
+    // avgCons (официальный расход) для «Сводки» и всех расчётов не меняется
+    return withApproxConsumption(withReal);
   }, [fuel]);
   // на длинном диапазоне подписи месяцев прореживаются, иначе они наезжают
   const monthsAxis = useMemo(() => monthTicks(months.map((m) => m.key)), [months]);
+  const hasApproxMonth = useMemo(() => months.some((m) => m.isApprox), [months]);
 
   /* ---------------- затраты ---------------- */
 
@@ -335,11 +339,33 @@ export default function ChartsTab({ fuel, service, theme }) {
                   contentStyle={tooltipStyle}
                   labelStyle={{ color: c.axis }}
                   labelFormatter={(key) => monthLabel(`${key}-01`)}
-                  formatter={(v) => [`${fmtNum(v, 2)} л/100 км`, "Расход"]}
+                  separator=": "
+                  formatter={(v, name, entry) =>
+                    entry && entry.payload && entry.payload.isApprox
+                      ? [`${fmtNum(v, 2)} л/100 км`, "Примерно"]
+                      : [`${fmtNum(v, 2)} л/100 км`, "Расход"]
+                  }
                 />
-                <Bar dataKey="avgCons" fill={c.green} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="consDisplay" radius={[4, 4, 0, 0]}>
+                  {months.map((m) => (
+                    <Cell
+                      key={m.key}
+                      fill={c.green}
+                      fillOpacity={m.isApprox ? 0.35 : 1}
+                      stroke={m.isApprox ? c.green : "none"}
+                      strokeWidth={m.isApprox ? 1 : 0}
+                      strokeDasharray={m.isApprox ? "3 2" : undefined}
+                    />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
+            {hasApproxMonth && (
+              <div className="chart-legend">
+                <span><i className="dot" style={{ background: c.green }} /> подтверждено</span>
+                <span><i className="dot dot--approx" style={{ borderColor: c.green }} /> приблизительная оценка</span>
+              </div>
+            )}
           </div>
 
           <div className="section-title">Расходы на топливо</div>
