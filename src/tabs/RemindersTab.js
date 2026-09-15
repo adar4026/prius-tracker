@@ -3,8 +3,9 @@ import Modal from "../components/Modal";
 import DateField from "../components/DateField";
 import useFocusEntry from "../components/useFocusEntry";
 import { REMINDER_ICONS } from "../data";
+import { needsDue, reminderFromForm } from "../reminderForm";
 import {
-  fmtDate, fmtKm, nearestDueLabel, nextId, num, reminderStatus, reminderUrgency,
+  fmtDate, fmtKm, nearestDueLabel, nextId, reminderStatus, reminderUrgency,
   todayISO,
 } from "../utils";
 
@@ -106,25 +107,10 @@ export default function RemindersTab({
 
   const submit = (e) => {
     e.preventDefault();
-    if (!form.title.trim()) return setError("Укажите название задачи");
-
-    const entry = {
-      // связи с ТО правятся из формы ТО, здесь они только сохраняются
-      ...(editing || {
-        sourceServiceId: null, completedServiceId: null,
-        intervalKm: null, intervalMonths: null,
-      }),
-      id: editing ? editing.id : nextId(reminders),
-      title: form.title.trim(),
-      icon: form.icon,
-      priority: form.priority,
-      dueKm: form.dueKm ? Math.round(num(form.dueKm)) : null,
-      dueDate: form.dueDate || null,
-      note: form.note.trim(),
-      completed: editing ? editing.completed : false,
-      completedDate: editing ? editing.completedDate : null,
-      completedKm: editing ? editing.completedKm : null,
-    };
+    const { entry, error: problem } = reminderFromForm(
+      form, editing, service, editing ? editing.id : nextId(reminders)
+    );
+    if (problem) return setError(problem);
 
     setReminders(
       editing
@@ -295,9 +281,15 @@ export default function RemindersTab({
                 <label>Срок, дата</label>
                 <DateField
                   label="Срок, дата"
+                  clearable
                   value={form.dueDate} onChange={(v) => setField("dueDate", v)}
                 />
               </div>
+            </div>
+            <div className="hint">
+              {needsDue(form.priority)
+                ? "Срок задаётся пробегом, датой или обоими сразу — сработает то, что наступит раньше."
+                : "В разделе «Ожидает установки» срок можно не указывать."}
             </div>
 
             <div className="field">

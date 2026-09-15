@@ -3,8 +3,9 @@ import DateField from "./DateField";
 import { fmtDate, fmtKm } from "../utils";
 
 // Быстрые интервалы. Сами по себе к виду работ не привязаны; единственная
-// подстановка — интервал по умолчанию для замены масла (OIL_INTERVAL_DEFAULTS),
-// который форма ТО ставит в пустые поля при включении плана.
+// подстановка — интервал по пробегу для замены масла (OIL_INTERVAL_DEFAULTS),
+// который форма ТО ставит в пустое поле «Через, км» при включении плана.
+// Срок по времени пользователь задаёт сам — или не задаёт вовсе.
 export const KM_PRESETS = [5000, 10000, 15000, 20000, 30000];
 export const MONTH_PRESETS = [6, 12, 24, 36];
 
@@ -100,6 +101,7 @@ export default function NextServiceFields({ form, setField, linkedDone }) {
               <label>Следующая дата</label>
               <DateField
                 label="Следующая дата"
+                clearable
                 value={form.nextDate}
                 onChange={(v) => setField("nextDate", v)}
               />
@@ -115,7 +117,7 @@ export default function NextServiceFields({ form, setField, linkedDone }) {
                 можно исправить вручную.
               </>
             ) : (
-              "Укажите интервал или задайте следующий пробег и дату вручную."
+              "Укажите интервал или задайте следующий пробег и/или дату вручную — достаточно одного срока."
             )}
           </div>
         </>

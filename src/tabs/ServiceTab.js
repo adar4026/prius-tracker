@@ -21,7 +21,7 @@ const today = () => todayISO();
 // поля формы ↔ позиции детализации расходов (см. COST_PARTS в utils)
 const COST_FIELDS = { costLabor: "labor", costOil: "oil", costFilter: "filter", costOther: "other" };
 
-const emptyForm = () => ({
+export const emptyForm = () => ({
   date: today(), km: "", type: "", cost: "", note: "", category: "oil",
   // блок «Расходы» — детализация общей стоимости для замены масла
   costLabor: "", costOil: "", costFilter: "", costOther: "",
@@ -47,13 +47,18 @@ const hasCostBlock = (f) => f.category === "oil";
  * пока пользователь не исправил их руками — иначе ручное значение затиралось
  * бы при любой правке даты или пробега.
  */
-function applyChange(f, name, value) {
+export function applyChange(f, name, value) {
   const next = { ...f, [name]: value };
   if (name === "nextKm") next.nextKmTouched = true;
   if (name === "nextDate") next.nextDateTouched = true;
   // выбор интервала — явное намерение пересчитать, ручная правка снимается
   if (name === "intervalKm") next.nextKmTouched = false;
   if (name === "intervalMonths") next.nextDateTouched = false;
+  // стёртый срок уносит с собой свой интервал: задача только по пробегу
+  // (или только по дате) не должна получить второй срок обратно при
+  // следующей правке записи
+  if (name === "nextKm" && value === "") next.intervalKm = "";
+  if (name === "nextDate" && value === "") next.intervalMonths = "";
 
   // детализация расходов заполняет общую стоимость своей суммой;
   // если все позиции стёрты, общая сумма снова вводится вручную
@@ -62,19 +67,15 @@ function applyChange(f, name, value) {
     if (total !== null) next.cost = String(total);
   }
 
-  // включённый план для замены масла получает интервал по умолчанию —
-  // только в пустые поля, введённое пользователем не трогается
+  // включённый план для замены масла получает интервал по пробегу по
+  // умолчанию — только в пустое поле, введённое пользователем не трогается.
+  // Интервал по времени не подставляется: пробег и дата — независимые
+  // сроки, и дата появляется только если её задал пользователь
   const planTurnedOn = name === "planNext" && value;
   const becameOil = name === "category" && value === "oil" && next.planNext;
-  if ((planTurnedOn || becameOil) && next.category === "oil") {
-    if (next.intervalKm === "") {
-      next.intervalKm = String(OIL_INTERVAL_DEFAULTS.km);
-      next.nextKmTouched = false;
-    }
-    if (next.intervalMonths === "") {
-      next.intervalMonths = String(OIL_INTERVAL_DEFAULTS.months);
-      next.nextDateTouched = false;
-    }
+  if ((planTurnedOn || becameOil) && next.category === "oil" && next.intervalKm === "") {
+    next.intervalKm = String(OIL_INTERVAL_DEFAULTS.km);
+    next.nextKmTouched = false;
   }
 
   const recalc = ["km", "date", "intervalKm", "intervalMonths", "planNext", "category"];

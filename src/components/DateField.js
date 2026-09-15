@@ -9,12 +9,17 @@ import React from "react";
  * ширина нативного контрола не влияет на layout grid-колонки.
  *
  * Наружу отдаёт ISO-значение YYYY-MM-DD — как обычный input[type="date"].
+ *
+ * clearable — необязательная дата: рядом со значением появляется «×»,
+ * которое отдаёт наружу пустую строку. Нужно потому, что нативный
+ * picker iOS не даёт стереть уже выбранную дату.
  */
-export default function DateField({ value, onChange, label, id }) {
+export default function DateField({ value, onChange, label, id, clearable = false }) {
   const display = value ? value.split("-").reverse().join(".") : "";
+  const showClear = clearable && !!value;
 
   return (
-    <div className="datefield">
+    <div className={`datefield ${showClear ? "datefield--clearable" : ""}`}>
       <input
         type="text"
         className="datefield__display"
@@ -32,6 +37,17 @@ export default function DateField({ value, onChange, label, id }) {
         aria-label={label}
         onChange={(e) => onChange(e.target.value)}
       />
+      {showClear && (
+        <button
+          type="button"
+          className="datefield__clear"
+          aria-label={`Очистить: ${label}`}
+          title="Очистить дату"
+          onClick={() => onChange("")}
+        >
+          ×
+        </button>
+      )}
     </div>
   );
 }

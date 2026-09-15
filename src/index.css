@@ -686,6 +686,28 @@ html[data-theme="light"] .filter-btn--active {
   appearance: none;
 }
 .datefield:focus-within .datefield__display { border-color: var(--accent); }
+/* «×» для необязательной даты лежит поверх нативного контрола, иначе тап
+   по нему открывал бы picker вместо очистки */
+.datefield--clearable .datefield__display { padding-right: 38px; }
+.datefield--clearable .datefield__native { right: 38px; width: auto; }
+.datefield__clear {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 38px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.datefield__clear:active { color: var(--text); }
 
 .form-row {
   display: grid;
