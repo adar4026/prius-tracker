@@ -907,6 +907,13 @@ html[data-theme="light"] .filter-btn--active {
   padding: 0 12px 2px 14px;
 }
 .analytic__period { font-size: 12px; color: var(--muted); white-space: nowrap; }
+/* подпись рядом с общим фильтром периода; на узком экране переносится под кнопку */
+.analytic__scope {
+  align-self: center;
+  font-size: 12px;
+  color: var(--muted);
+  min-width: 0;
+}
 .analytic__value {
   padding: 0 12px 6px 14px;
   font-size: 13px;
@@ -1055,6 +1062,12 @@ html[data-theme="light"] .item--card {
 }
 /* на главной все карточки (пробег, статистика, масло, автомобиль) тоже белые */
 html[data-theme="light"] .screen--home .card {
+  background: #ffffff;
+  border-color: #d4e2e8;
+  box-shadow: 0 4px 14px rgba(32, 74, 91, 0.10);
+}
+/* в «Графиках» — все карточки: графики, итоги, минимум/максимум, аналитика */
+html[data-theme="light"] .screen--charts .card {
   background: #ffffff;
   border-color: #d4e2e8;
   box-shadow: 0 4px 14px rgba(32, 74, 91, 0.10);

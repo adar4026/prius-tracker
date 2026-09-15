@@ -8,19 +8,12 @@ import FilterMenu from "../components/FilterMenu";
 import { chartColors } from "../themes";
 import {
   avg, byKmAsc, consumptionPoints, fmtDate, fmtKm, fmtMoney, fmtNum, isFull,
-  monthLabel, num, numOrNull, yearsOf,
+  monthLabel, num, numOrNull,
 } from "../utils";
 import {
-  avgKmPerDay, expenseEntries, inPeriod, kmTicks, mileagePoints, monthTicks,
-  monthlyExpenses, periodLabel, timeTicks, tsToISO,
+  avgKmPerDay, expenseEntries, filterPeriod, kmTicks, mileagePoints, monthTicks,
+  monthlyExpenses, periodLabel, periodOptions, timeTicks, tsToISO,
 } from "../analytics";
-
-const MODES = [
-  { id: "consumption", label: "Расход" },
-  { id: "price", label: "Цена" },
-  { id: "months", label: "Месяцы" },
-  { id: "costs", label: "Затраты" },
-];
 
 const shortDate = (iso) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}`;
 
@@ -31,9 +24,12 @@ const kmTick = (v) =>
 
 const DAY_MS = 86400000;
 
+/**
+ * Раздел «Графики». Один период на весь экран: выбранный год (или «Все»)
+ * срезает заправки и записи ТО, а все графики и показатели ниже считаются
+ * уже по этому срезу — по тем же формулам, что и раньше.
+ */
 export default function ChartsTab({ fuel, service, theme }) {
-  const [mode, setMode] = useState("consumption");
-  // период аналитических карточек — та же модель, что «Период» в журналах
   const [period, setPeriod] = useState("all");
   const c = chartColors(theme);
 
@@ -50,29 +46,54 @@ export default function ChartsTab({ fuel, service, theme }) {
     tickLine: false,
   };
 
+  /* ---------------- период ---------------- */
+
+  const options = useMemo(() => periodOptions(fuel, service), [fuel, service]);
+  // выбранный год мог исчезнуть после удаления записей
+  const activePeriod = options.some((o) => o.id === period) ? period : "all";
+  const periodText = periodLabel(activePeriod);
+
+  // единственный срез по периоду — дальше все расчёты работают с ним
+  const fuelP = useMemo(() => filterPeriod(fuel, activePeriod), [fuel, activePeriod]);
+  const serviceP = useMemo(() => filterPeriod(service, activePeriod), [service, activePeriod]);
+
+  /* ---------------- расход ---------------- */
+
+  // расход каждой заправки хранится в записи, поэтому январская заправка
+  // сохраняет цикл от декабрьского полного бака и при фильтре по году
   const consumption = useMemo(
-    () => consumptionPoints(fuel).map((f) => ({ ...f, label: shortDate(f.date) })),
-    [fuel]
+    () => consumptionPoints(fuelP).map((f) => ({ ...f, label: shortDate(f.date) })),
+    [fuelP]
   );
   const avgConsumption = useMemo(
     () => avg(consumption.map((f) => f.consumption)),
     [consumption]
   );
+  const minConsumption = consumption.length
+    ? Math.min(...consumption.map((x) => x.consumption))
+    : null;
+  const maxConsumption = consumption.length
+    ? Math.max(...consumption.map((x) => x.consumption))
+    : null;
+
+  /* ---------------- цена ---------------- */
 
   // заправки с неизвестной ценой на график не попадают — иначе это ноль в ряду
   const prices = useMemo(
     () =>
-      [...fuel]
+      [...fuelP]
         .sort(byKmAsc)
         .filter((f) => numOrNull(f.pricePerL) !== null)
         .map((f) => ({ label: shortDate(f.date), price: num(f.pricePerL) })),
-    [fuel]
+    [fuelP]
   );
   const avgPrice = useMemo(() => avg(prices.map((p) => p.price)), [prices]);
 
+  /* ---------------- месяцы ---------------- */
+
   const months = useMemo(() => {
     const map = new Map();
-    [...fuel].sort(byKmAsc).forEach((f) => {
+    [...fuelP].sort(byKmAsc).forEach((f) => {
       const key = f.date.slice(0, 7);
       if (!map.has(key)) map.set(key, { key, label: monthLabel(f.date), spent: 0, liters: 0, fills: 0, cons: [] });
       const m = map.get(key);
@@ -84,31 +105,21 @@ export default function ChartsTab({ fuel, service, theme }) {
     return [...map.values()]
       .sort((a, b) => a.key.localeCompare(b.key))
       .map((m) => ({ ...m, avgCons: m.cons.length ? avg(m.cons) : null }));
-  }, [fuel]);
+  }, [fuelP]);
+  // на длинном диапазоне подписи месяцев прореживаются, иначе они наезжают
+  const monthsAxis = useMemo(() => monthTicks(months.map((m) => m.key)), [months]);
+
+  /* ---------------- затраты ---------------- */
 
   // итоговые суммы — те же, что раньше стояли на главной
-  const totalFuel = useMemo(() => fuel.reduce((s, f) => s + num(f.paidTotal), 0), [fuel]);
-  const totalService = useMemo(() => service.reduce((s, r) => s + num(r.cost), 0), [service]);
+  const totalFuel = useMemo(() => fuelP.reduce((s, f) => s + num(f.paidTotal), 0), [fuelP]);
+  const totalService = useMemo(() => serviceP.reduce((s, r) => s + num(r.cost), 0), [serviceP]);
   const totalCosts = totalFuel + totalService;
   const fuelShare = totalCosts > 0 ? Math.round((totalFuel / totalCosts) * 100) : 0;
 
-  /* ---------------- аналитика: пробег и расходы по месяцам ---------------- */
+  /* ---------------- пробег ---------------- */
 
-  const periodOptions = useMemo(
-    () => [
-      { id: "all", label: "Все записи", shortLabel: "Все" },
-      ...yearsOf(fuel, service).map((y) => ({ id: y, label: y })),
-    ],
-    [fuel, service]
-  );
-  // выбранный год мог исчезнуть после удаления записей
-  const activePeriod = periodOptions.some((o) => o.id === period) ? period : "all";
-
-  const allMileage = useMemo(() => mileagePoints(fuel, service), [fuel, service]);
-  const mileage = useMemo(
-    () => allMileage.filter((p) => inPeriod(p, activePeriod)),
-    [allMileage, activePeriod]
-  );
+  const mileage = useMemo(() => mileagePoints(fuelP, serviceP), [fuelP, serviceP]);
   const kmPerDay = useMemo(() => avgKmPerDay(mileage), [mileage]);
   const mileageAxis = useMemo(() => {
     if (!mileage.length) return { domain: [0, 1], y: kmTicks(NaN, NaN), ticks: [], format: () => "" };
@@ -120,92 +131,91 @@ export default function ChartsTab({ fuel, service, theme }) {
     return { domain: [min, max], y, ...timeTicks(min, max) };
   }, [mileage]);
 
-  const expenses = useMemo(() => expenseEntries(fuel, service), [fuel, service]);
+  /* ---------------- расходы по месяцам ---------------- */
+
+  const expenses = useMemo(() => expenseEntries(fuelP, serviceP), [fuelP, serviceP]);
   const monthly = useMemo(() => monthlyExpenses(expenses, activePeriod), [expenses, activePeriod]);
   const monthlyAxis = useMemo(
     () => monthTicks(monthly.months.map((m) => m.key)),
     [monthly]
   );
-  const spentPeriodLabel = periodLabel(activePeriod);
 
   return (
-    <main className="screen">
-      <div className="seg">
-        {MODES.map((m) => (
-          <button
-            key={m.id}
-            className={mode === m.id ? "active" : ""}
-            onClick={() => setMode(m.id)}
-          >
-            {m.label}
-          </button>
-        ))}
+    <main className="screen screen--charts">
+      {/* ---------- расход топлива ---------- */}
+
+      <div className="section-title">Расход топлива</div>
+      {!consumption.length ? (
+        <div className="card">
+          <div className="empty">Недостаточно данных для расчёта расхода</div>
+        </div>
+      ) : (
+        <div className="card chart-card">
+          <ResponsiveContainer width="100%" height={250}>
+            <LineChart data={consumption} margin={{ top: 10, right: 12, left: -18, bottom: 0 }}>
+              <CartesianGrid stroke={c.grid} strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="label" {...axisProps} interval="preserveStartEnd" minTickGap={16} />
+              <YAxis domain={["dataMin - 0.4", "dataMax + 0.4"]} {...axisProps} width={44} tickFormatter={(v) => v.toFixed(1)} />
+              <Tooltip
+                contentStyle={tooltipStyle}
+                labelStyle={{ color: c.axis }}
+                formatter={(v) => [`${fmtNum(v, 2)} л/100 км`, "Расход"]}
+              />
+              {avgConsumption && (
+                <ReferenceLine
+                  y={avgConsumption}
+                  stroke={c.gold}
+                  strokeDasharray="5 4"
+                  label={{ value: `среднее ${fmtNum(avgConsumption, 2)}`, fill: c.gold, fontSize: 10, position: "insideTopRight" }}
+                />
+              )}
+              <Line
+                type="monotone" dataKey="consumption" stroke={c.green} strokeWidth={2.4}
+                dot={{ r: 2.6, fill: c.green, strokeWidth: 0 }} activeDot={{ r: 5 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+          <div className="chart-legend">
+            <span><i className="dot" style={{ background: c.green }} /> л/100 км</span>
+            <span><i className="dot" style={{ background: c.gold }} /> среднее</span>
+          </div>
+        </div>
+      )}
+
+      <div className="grid-2" style={{ marginTop: 10 }}>
+        <div className="card stat">
+          <div className="stat__label">Минимум</div>
+          <div className="stat__value" style={{ color: "var(--green)" }}>
+            {fmtNum(minConsumption, 2)}
+            <span className="stat__unit">л/100 км</span>
+          </div>
+        </div>
+        <div className="card stat">
+          <div className="stat__label">Максимум</div>
+          <div className="stat__value" style={{ color: "var(--red)" }}>
+            {fmtNum(maxConsumption, 2)}
+            <span className="stat__unit">л/100 км</span>
+          </div>
+        </div>
+      </div>
+      <div className="hint" style={{ padding: "0 2px" }}>
+        Заправки «не до полного» в расчёте не участвуют.
       </div>
 
-      {mode === "consumption" && !consumption.length && (
-        <div className="empty">Недостаточно данных для расчёта расхода</div>
-      )}
+      {/* ---------- общий период ---------- */}
 
-      {mode === "consumption" && consumption.length > 0 && (
-        <>
-          <div className="card chart-card">
-            <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={consumption} margin={{ top: 10, right: 12, left: -18, bottom: 0 }}>
-                <CartesianGrid stroke={c.grid} strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="label" {...axisProps} interval="preserveStartEnd" minTickGap={16} />
-                <YAxis domain={["dataMin - 0.4", "dataMax + 0.4"]} {...axisProps} width={44} tickFormatter={(v) => v.toFixed(1)} />
-                <Tooltip
-                  contentStyle={tooltipStyle}
-                  labelStyle={{ color: c.axis }}
-                  formatter={(v) => [`${fmtNum(v, 2)} л/100 км`, "Расход"]}
-                />
-                {avgConsumption && (
-                  <ReferenceLine
-                    y={avgConsumption}
-                    stroke={c.gold}
-                    strokeDasharray="5 4"
-                    label={{ value: `среднее ${fmtNum(avgConsumption, 2)}`, fill: c.gold, fontSize: 10, position: "insideTopRight" }}
-                  />
-                )}
-                <Line
-                  type="monotone" dataKey="consumption" stroke={c.green} strokeWidth={2.4}
-                  dot={{ r: 2.6, fill: c.green, strokeWidth: 0 }} activeDot={{ r: 5 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-            <div className="chart-legend">
-              <span><i className="dot" style={{ background: c.green }} /> л/100 км</span>
-              <span><i className="dot" style={{ background: c.gold }} /> среднее</span>
-            </div>
-          </div>
+      <div className="section-title">Аналитика</div>
+      <div className="filter-row" style={{ paddingTop: 0 }}>
+        <FilterMenu name="Период" title="Период" value={activePeriod} options={options} onChange={setPeriod} />
+        <span className="analytic__scope">{periodText} · все графики раздела</span>
+      </div>
 
-          <div className="grid-2" style={{ marginTop: 10 }}>
-            <div className="card stat">
-              <div className="stat__label">Минимум</div>
-              <div className="stat__value" style={{ color: "var(--green)" }}>
-                {fmtNum(Math.min(...consumption.map((x) => x.consumption)), 2)}
-                <span className="stat__unit">л/100 км</span>
-              </div>
-            </div>
-            <div className="card stat">
-              <div className="stat__label">Максимум</div>
-              <div className="stat__value" style={{ color: "var(--red)" }}>
-                {fmtNum(Math.max(...consumption.map((x) => x.consumption)), 2)}
-                <span className="stat__unit">л/100 км</span>
-              </div>
-            </div>
-          </div>
-          <div className="hint" style={{ padding: "0 2px" }}>
-            Заправки «не до полного» в расчёте не участвуют.
-          </div>
-        </>
-      )}
+      {/* ---------- цена ---------- */}
 
-      {mode === "price" && !prices.length && (
-        <div className="empty">Нет заправок</div>
-      )}
-
-      {mode === "price" && prices.length > 0 && (
+      <div className="section-title">Цена топлива</div>
+      {!prices.length ? (
+        <div className="card"><div className="empty">Нет заправок за период</div></div>
+      ) : (
         <>
           <div className="card chart-card">
             <ResponsiveContainer width="100%" height={250}>
@@ -248,56 +258,24 @@ export default function ChartsTab({ fuel, service, theme }) {
         </>
       )}
 
-      {mode === "costs" && totalCosts === 0 && (
-        <div className="empty">Нет данных о расходах</div>
-      )}
+      {/* ---------- месяцы ---------- */}
 
-      {mode === "costs" && totalCosts > 0 && (
+      <div className="section-title">Средний расход по месяцам</div>
+      {!months.length ? (
+        <div className="card"><div className="empty">Нет заправок за период</div></div>
+      ) : (
         <>
-          <div className="card hero">
-            <div className="hero__label">Всего расходов</div>
-            <div className="hero__value">{fmtMoney(totalCosts, 0)}</div>
-            <div className="hero__note">Топливо + ТО и ремонт</div>
-          </div>
-
-          <div className="grid-2" style={{ marginTop: 10 }}>
-            <Stat icon="⛽" label="Топливо" value={fmtMoney(totalFuel, 0)} color="var(--gold)" />
-            <Stat icon="🔧" label="ТО и ремонт" value={fmtMoney(totalService, 0)} color="var(--blue)" />
-          </div>
-
-          <div className="card" style={{ marginTop: 10 }}>
-            <div className="progress__head">
-              <span className="progress__title">Распределение</span>
-            </div>
-            <div className="bar split">
-              <div className="split__part" style={{ width: `${fuelShare}%`, background: "var(--gold)" }} />
-              <div className="split__part" style={{ flex: 1, background: "var(--blue)" }} />
-            </div>
-            <div className="progress__meta">
-              <span style={{ color: "var(--gold)" }}>Топливо {fuelShare}%</span>
-              <span style={{ color: "var(--blue)" }}>ТО и ремонт {100 - fuelShare}%</span>
-            </div>
-          </div>
-        </>
-      )}
-
-      {mode === "months" && !months.length && (
-        <div className="empty">Нет заправок</div>
-      )}
-
-      {mode === "months" && months.length > 0 && (
-        <>
-          <div className="section-title">Средний расход по месяцам</div>
           <div className="card chart-card">
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={months} margin={{ top: 6, right: 12, left: -18, bottom: 0 }}>
                 <CartesianGrid stroke={c.grid} strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="label" {...axisProps} interval={0} angle={-35} textAnchor="end" height={44} />
+                <XAxis dataKey="key" ticks={monthsAxis.ticks} tickFormatter={monthsAxis.format} {...axisProps} interval={0} />
                 <YAxis domain={[0, "dataMax + 0.5"]} {...axisProps} width={44} tickFormatter={(v) => v.toFixed(1)} />
                 <Tooltip
                   cursor={{ fill: c.grid, opacity: 0.35 }}
                   contentStyle={tooltipStyle}
                   labelStyle={{ color: c.axis }}
+                  labelFormatter={(key) => monthLabel(`${key}-01`)}
                   formatter={(v) => [`${fmtNum(v, 2)} л/100 км`, "Расход"]}
                 />
                 <Bar dataKey="avgCons" fill={c.green} radius={[4, 4, 0, 0]} />
@@ -310,12 +288,13 @@ export default function ChartsTab({ fuel, service, theme }) {
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={months} margin={{ top: 6, right: 12, left: -12, bottom: 0 }}>
                 <CartesianGrid stroke={c.grid} strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="label" {...axisProps} interval={0} angle={-35} textAnchor="end" height={44} />
+                <XAxis dataKey="key" ticks={monthsAxis.ticks} tickFormatter={monthsAxis.format} {...axisProps} interval={0} />
                 <YAxis {...axisProps} width={50} tickFormatter={(v) => Math.round(v)} />
                 <Tooltip
                   cursor={{ fill: c.grid, opacity: 0.35 }}
                   contentStyle={tooltipStyle}
                   labelStyle={{ color: c.axis }}
+                  labelFormatter={(key) => monthLabel(`${key}-01`)}
                   formatter={(v) => [fmtMoney(v), "Потрачено"]}
                 />
                 <Bar dataKey="spent" fill={c.gold} radius={[4, 4, 0, 0]} />
@@ -354,15 +333,47 @@ export default function ChartsTab({ fuel, service, theme }) {
         </>
       )}
 
-      <div className="section-title">Аналитика</div>
-      <div className="filter-row" style={{ paddingTop: 0 }}>
-        <FilterMenu name="Период" title="Период" value={activePeriod} options={periodOptions} onChange={setPeriod} />
-      </div>
+      {/* ---------- затраты ---------- */}
 
-      <div className="card chart-card">
+      <div className="section-title">Затраты</div>
+      {totalCosts === 0 ? (
+        <div className="card"><div className="empty">Нет данных о расходах за период</div></div>
+      ) : (
+        <>
+          <div className="card hero">
+            <div className="hero__label">Всего расходов</div>
+            <div className="hero__value">{fmtMoney(totalCosts, 0)}</div>
+            <div className="hero__note">Топливо + ТО и ремонт · {periodText.toLowerCase()}</div>
+          </div>
+
+          <div className="grid-2" style={{ marginTop: 10 }}>
+            <Stat icon="⛽" label="Топливо" value={fmtMoney(totalFuel, 0)} color="var(--gold)" />
+            <Stat icon="🔧" label="ТО и ремонт" value={fmtMoney(totalService, 0)} color="var(--blue)" />
+          </div>
+
+          <div className="card" style={{ marginTop: 10 }}>
+            <div className="progress__head">
+              <span className="progress__title">Распределение</span>
+            </div>
+            <div className="bar split">
+              <div className="split__part" style={{ width: `${fuelShare}%`, background: "var(--gold)" }} />
+              <div className="split__part" style={{ flex: 1, background: "var(--blue)" }} />
+            </div>
+            <div className="progress__meta">
+              <span style={{ color: "var(--gold)" }}>Топливо {fuelShare}%</span>
+              <span style={{ color: "var(--blue)" }}>ТО и ремонт {100 - fuelShare}%</span>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ---------- пробег ---------- */}
+
+      {/* карточки аналитики сами себя подписывают — заголовок раздела не нужен */}
+      <div className="card chart-card" style={{ marginTop: 22 }}>
         <div className="analytic__head">
           <div className="hero__label">Пробег</div>
-          <div className="analytic__period">{spentPeriodLabel}</div>
+          <div className="analytic__period">{periodText}</div>
         </div>
         <div className="analytic__value">
           В среднем в сутки:
@@ -402,10 +413,12 @@ export default function ChartsTab({ fuel, service, theme }) {
         </div>
       </div>
 
+      {/* ---------- ежемесячные затраты ---------- */}
+
       <div className="card chart-card">
         <div className="analytic__head">
           <div className="hero__label">Ежемесячные затраты</div>
-          <div className="analytic__period">{spentPeriodLabel}</div>
+          <div className="analytic__period">{periodText}</div>
         </div>
         <div className="analytic__value">
           В среднем в мес.:

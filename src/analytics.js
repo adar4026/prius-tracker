@@ -2,7 +2,7 @@
 // Только чистые функции над уже существующими данными — заправками и
 // записями ТО. Ничего не хранится, всё пересчитывается от текущих списков.
 
-import { MONTHS_SHORT, entryYear, monthLabel, numOrNull, todayISO } from "./utils";
+import { MONTHS_SHORT, entryYear, monthLabel, numOrNull, todayISO, yearsOf } from "./utils";
 
 const DAY_MS = 86400000;
 
@@ -37,6 +37,19 @@ export const inPeriod = (entry, period) =>
 
 export const periodLabel = (period) =>
   period === "all" ? "За всё время" : `За ${period} год`;
+
+/** Записи выбранного периода — общий срез для всех графиков раздела. */
+export const filterPeriod = (list, period) =>
+  period === "all" ? list : (Array.isArray(list) ? list : []).filter((e) => inPeriod(e, period));
+
+/**
+ * Варианты фильтра «Период» в том же виде, что в журналах: «Все записи»
+ * и годы, встречающиеся в записях (от новых к старым).
+ */
+export const periodOptions = (...lists) => [
+  { id: "all", label: "Все записи", shortLabel: "Все" },
+  ...yearsOf(...lists).map((y) => ({ id: y, label: y })),
+];
 
 /* ---------------- пробег ---------------- */
 

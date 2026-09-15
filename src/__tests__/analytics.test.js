@@ -1,7 +1,7 @@
 import {
-  avgKmPerDay, daysBetween, expenseEntries, inPeriod, isValidISODate, kmTicks,
-  mileagePoints, monthRange, monthTicks, monthlyExpenses, periodMonthBounds,
-  timeTicks,
+  avgKmPerDay, daysBetween, expenseEntries, filterPeriod, inPeriod, isValidISODate,
+  kmTicks, mileagePoints, monthRange, monthTicks, monthlyExpenses,
+  periodMonthBounds, periodOptions, timeTicks,
 } from "../analytics";
 import { INITIAL_FUEL, INITIAL_SERVICE } from "../data";
 import { migrateFuel, migrateService } from "../utils";
@@ -95,6 +95,16 @@ describe("расходы", () => {
     expect(inPeriod({ date: "2026-03-11" }, "all")).toBe(true);
     expect(inPeriod({ date: "2026-03-11" }, "2026")).toBe(true);
     expect(inPeriod({ date: "2026-03-11" }, "2025")).toBe(false);
+  });
+
+  test("общий срез по периоду и варианты фильтра", () => {
+    const list = [fuel("2026-03-11", 1), fuel("2025-12-27", 2), service("2024-06-08", 3)];
+    expect(filterPeriod(list, "all")).toBe(list);
+    expect(filterPeriod(list, "2025").map((e) => e.date)).toEqual(["2025-12-27"]);
+    expect(filterPeriod(list, "2019")).toEqual([]);
+    expect(filterPeriod(null, "2026")).toEqual([]);
+    expect(periodOptions(list.slice(0, 2), list.slice(2)).map((o) => o.id)).toEqual(["all", "2026", "2025", "2024"]);
+    expect(periodOptions([], []).map((o) => o.id)).toEqual(["all"]);
   });
 
   test("диапазон месяцев включает пустые месяцы между границами", () => {
