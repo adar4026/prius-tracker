@@ -183,7 +183,11 @@ export function periodMonthBounds(entries, period, today = todayISO()) {
  * истории (заправки + ТО), а суммы — только из нужной категории.
  */
 export function monthlyExpenses(entries, period, today = todayISO(), boundsEntries = entries) {
-  const bounds = periodMonthBounds(boundsEntries, period, today);
+  return expensesByMonth(entries, period, periodMonthBounds(boundsEntries, period, today));
+}
+
+/** Раскладка расходов периода по заданному диапазону месяцев; без диапазона — пусто. */
+export function expensesByMonth(entries, period, bounds) {
   if (!bounds) return { months: [], total: 0, avgPerMonth: null };
 
   const sums = new Map();
@@ -229,19 +233,26 @@ export function periodDayBounds(entries, period, today = todayISO()) {
 
 /**
  * Расходы на топливо по месяцам выбранного периода вкладки «Затраты».
- * Границы диапазона — по всей истории (заправки + ТО), суммы — только
- * из paidTotal заправок, поэтому год без единой заправки всё равно
- * раскладывается по 12 нулевым месяцам, а не пропадает из графика.
+ *
+ * Диапазон начинается с первого месяца, за который есть заправка с известной
+ * оплаченной суммой, — а не с первой записи автомобиля. Месяцы до этого —
+ * не «0 €», а отсутствие данных, и в знаменатель среднего они не входят.
+ * Внутри диапазона месяц без заправок — действительно 0 €. Для года диапазон
+ * тоже обрезается снизу по первой финансовой записи (июнь 2025 → июнь–декабрь,
+ * а не январь–декабрь). Год без единой оплаченной заправки — пусто, avg null.
  */
-export function monthlyFuelCosts(fuel = [], service = [], period, today = todayISO()) {
-  const boundsEntries = expenseEntries(fuel, service);
-  const fuelEntries = expenseEntries(fuel, []);
-  return monthlyExpenses(fuelEntries, period, today, boundsEntries);
+export function monthlyFuelCosts(fuel = [], period, today = todayISO()) {
+  const paid = expenseEntries(fuel, []).filter((e) => e.amount !== null);
+  const bounds = periodMonthBounds(paid, period, today);
+  if (!bounds) return expensesByMonth(paid, period, null);
+  const firstKnown = monthKey(paid[0].date);
+  const from = bounds.from > firstKnown ? bounds.from : firstKnown;
+  return expensesByMonth(paid, period, { from, to: bounds.to });
 }
 
 /** Среднемесячный расход на топливо за период — avgPerMonth из monthlyFuelCosts. */
-export function averageFuelCostPerMonth(fuel, service, period, today = todayISO()) {
-  return monthlyFuelCosts(fuel, service, period, today).avgPerMonth;
+export function averageFuelCostPerMonth(fuel, period, today = todayISO()) {
+  return monthlyFuelCosts(fuel, period, today).avgPerMonth;
 }
 
 /** Расходы на ТО и ремонт по месяцам выбранного периода — суммы из cost записей ТО. */

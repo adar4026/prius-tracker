@@ -135,19 +135,19 @@ export default function ChartsTab({ fuel, service, theme }) {
   const totalCosts = totalFuel + totalService;
   const fuelShare = totalCosts > 0 ? Math.round((totalFuel / totalCosts) * 100) : 0;
 
-  // ежемесячные затраты на топливо — границы диапазона по всей истории,
-  // поэтому год без единой заправки раскладывается на 12 нулевых месяцев
+  // ежемесячные затраты на топливо — диапазон от первой заправки с известной
+  // суммой: месяцы до неё это отсутствие данных, а не 0 €
   const fuelMonthly = useMemo(
-    () => monthlyFuelCosts(fuel, service, activeCostsPeriod),
-    [fuel, service, activeCostsPeriod]
+    () => monthlyFuelCosts(fuel, activeCostsPeriod),
+    [fuel, activeCostsPeriod]
   );
   const fuelMonthlyAxis = useMemo(
     () => monthTicks(fuelMonthly.months.map((m) => m.key)),
     [fuelMonthly]
   );
   const avgFuelPerMonth = useMemo(
-    () => averageFuelCostPerMonth(fuel, service, activeCostsPeriod),
-    [fuel, service, activeCostsPeriod]
+    () => averageFuelCostPerMonth(fuel, activeCostsPeriod),
+    [fuel, activeCostsPeriod]
   );
 
   // ежедневные затраты на ТО и ремонт: крупный показатель — среднее в день,
@@ -415,7 +415,7 @@ export default function ChartsTab({ fuel, service, theme }) {
             <b>{fmtMoney(avgFuelPerMonth)}</b>
           </div>
           {fuelMonthly.months.length === 0 ? (
-            <div className="analytic__empty">Нет данных за период</div>
+            <div className="analytic__empty">Нет данных о заправках за период</div>
           ) : (
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={fuelMonthly.months} margin={{ top: 10, right: 14, left: -12, bottom: 0 }} barCategoryGap="20%">

@@ -5,6 +5,7 @@ import {
   periodMonthBounds, periodOptions, serviceCostsByMonth, timeTicks,
 } from "../analytics";
 import { INITIAL_FUEL, INITIAL_SERVICE } from "../data";
+import { HISTORY_IMPORTS, applyFuelBatch } from "../history";
 import { migrateFuel, migrateService } from "../utils";
 
 const fuel = (date, km, paidTotal = 40) => ({ id: km, date, km, paidTotal });
@@ -281,9 +282,9 @@ describe("границы календарных дней периода", () => 
 });
 
 describe("ежемесячные затраты на топливо (вкладка «Затраты»)", () => {
-  test("среднее в месяц: несколько заправок в одном месяце и нулевые месяцы между ними", () => {
+  test("пустой месяц между двумя известными считается 0 €, несколько заправок в месяце суммируются", () => {
     const fuelList = [fuel("2026-01-05", 1, 40), fuel("2026-01-10", 2, 43.5), fuel("2026-03-06", 3, 40)];
-    const { months, total, avgPerMonth } = monthlyFuelCosts(fuelList, [], "all", "2026-03-15");
+    const { months, total, avgPerMonth } = monthlyFuelCosts(fuelList, "all", "2026-03-15");
     expect(months.map((m) => [m.key, m.total])).toEqual([
       ["2026-01", 83.5],
       ["2026-02", 0],
@@ -291,30 +292,86 @@ describe("ежемесячные затраты на топливо (вклад�
     ]);
     expect(total).toBe(123.5);
     expect(avgPerMonth).toBeCloseTo(123.5 / 3, 6);
-    expect(averageFuelCostPerMonth(fuelList, [], "all", "2026-03-15")).toBe(avgPerMonth);
+    expect(averageFuelCostPerMonth(fuelList, "all", "2026-03-15")).toBe(avgPerMonth);
   });
 
-  test("год без единой заправки — 12 нулевых месяцев, а не пусто", () => {
-    const fuelList = [fuel("2025-06-01", 1, 50)];
-    const serviceList = [service("2026-02-19", 2, 100)];
-    const { months, avgPerMonth } = monthlyFuelCosts(fuelList, serviceList, "2026", "2026-09-15");
-    expect(months).toHaveLength(9); // янв–сен 2026
-    expect(months.every((m) => m.total === 0)).toBe(true);
-    expect(avgPerMonth).toBe(0);
+  test("«всё время»: диапазон начинается с первой заправки с суммой, а не с первой записи автомобиля", () => {
+    // ТО с 2018 года топливный диапазон не растягивает — в monthlyFuelCosts оно не передаётся вовсе
+    const fuelList = [fuel("2025-06-10", 1, 40), fuel("2026-09-06", 2, 38.5)];
+    const { months, avgPerMonth } = monthlyFuelCosts(fuelList, "all", "2026-09-15");
+    expect(months[0].key).toBe("2025-06");
+    expect(months[months.length - 1].key).toBe("2026-09");
+    expect(months).toHaveLength(16);
+    // 78,50 / 16, а не / 104 месяца с 2018 года
+    expect(avgPerMonth).toBeCloseTo(78.5 / 16, 6);
+  });
+
+  test("заправка без суммы диапазон не открывает: месяцы до первой оплаченной — не нули", () => {
+    const fuelList = [
+      { id: 1, date: "2024-03-01", km: 1, paidTotal: null },
+      fuel("2025-06-10", 2, 40),
+    ];
+    const { months, avgPerMonth } = monthlyFuelCosts(fuelList, "all", "2025-07-15");
+    expect(months.map((m) => m.key)).toEqual(["2025-06", "2025-07"]);
+    expect(avgPerMonth).toBe(20);
+  });
+
+  test("конкретный год с данными: обрезается снизу по первой финансовой записи", () => {
+    const fuelList = [fuel("2025-06-10", 1, 70), fuel("2025-12-27", 2, 70)];
+    const { months, avgPerMonth } = monthlyFuelCosts(fuelList, "2025", "2026-09-15");
+    // июнь–декабрь, а не январь–декабрь
+    expect(months.map((m) => m.key)).toEqual(
+      ["2025-06", "2025-07", "2025-08", "2025-09", "2025-10", "2025-11", "2025-12"]
+    );
+    expect(avgPerMonth).toBe(20);
+  });
+
+  test("год после первой финансовой записи: считается с января, пропуски внутри — 0 €", () => {
+    const fuelList = [fuel("2025-06-10", 1, 40), fuel("2026-03-06", 2, 60)];
+    const { months, avgPerMonth } = monthlyFuelCosts(fuelList, "2026", "2026-03-15");
+    expect(months.map((m) => [m.key, m.total])).toEqual([
+      ["2026-01", 0],
+      ["2026-02", 0],
+      ["2026-03", 60],
+    ]);
+    expect(avgPerMonth).toBe(20);
+  });
+
+  test("конкретный год без финансовых данных о топливе — пусто, а не 0 €", () => {
+    const fuelList = [fuel("2025-06-10", 1, 40)];
+    const { months, total, avgPerMonth } = monthlyFuelCosts(fuelList, "2018", "2026-09-15");
+    expect(months).toEqual([]);
+    expect(total).toBe(0);
+    expect(avgPerMonth).toBeNull();
   });
 
   test("текущий незавершённый год — только месяцы по сегодня, без будущих", () => {
     const fuelList = [fuel("2026-01-05", 1, 40)];
-    const { months } = monthlyFuelCosts(fuelList, [], "2026", "2026-03-15");
+    const { months } = monthlyFuelCosts(fuelList, "2026", "2026-03-15");
     expect(months.map((m) => m.key)).toEqual(["2026-01", "2026-02", "2026-03"]);
   });
 
   test("совсем без данных — пусто, без NaN/Infinity", () => {
-    const { months, total, avgPerMonth } = monthlyFuelCosts([], [], "all", "2026-09-15");
+    const { months, total, avgPerMonth } = monthlyFuelCosts([], "all", "2026-09-15");
     expect(months).toEqual([]);
     expect(total).toBe(0);
     expect(avgPerMonth).toBeNull();
     expect(Number.isFinite(total)).toBe(true);
+    expect(averageFuelCostPerMonth([{ date: "2026-01-16", km: 1, paidTotal: null }], "all", "2026-09-15")).toBeNull();
+  });
+});
+
+describe("топливо: реальные данные Lexcar", () => {
+  const f = HISTORY_IMPORTS.reduce(applyFuelBatch, migrateFuel(INITIAL_FUEL));
+
+  test("финансовые данные о топливе есть с июня 2025, среднее делится на 16 месяцев, а не на 104", () => {
+    const { months, total, avgPerMonth } = monthlyFuelCosts(f, "all", "2026-09-15");
+    expect(months[0].key).toBe("2025-06");
+    expect(months).toHaveLength(16);
+    expect(total).toBeCloseTo(2542.42, 2);
+    expect(avgPerMonth).toBeCloseTo(2542.42 / 16, 2);
+    // 2018 год есть только в ТО — для топлива это «нет данных»
+    expect(monthlyFuelCosts(f, "2018", "2026-09-15").months).toEqual([]);
   });
 });
 
