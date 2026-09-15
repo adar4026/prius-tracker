@@ -334,8 +334,10 @@ describe("восстановление пробега по опорным точ
       expect(anchors[i].km).toBeGreaterThanOrEqual(anchors[i - 1].km);
       expect(anchors[i].date >= anchors[i - 1].date).toBe(true);
     }
-    // дворники 21.11.2024 на 170 000 км — откат назад после шин 25.09 (174 000), точкой не стали
-    expect(anchors.some((a) => a.date === "2024-11-21")).toBe(false);
+    // откат одометра назад (дворники 21.11.2024 на 170 000 км до правки) точкой не становится
+    const raw = odometerAnchors([], [{ date: "2024-09-25", km: 174000 }, { date: "2024-11-21", km: 170000 }], []);
+    expect(raw).toEqual([{ date: "2024-09-25", km: 174000 }]);
+    expect(anchors.some((a) => a.date === "2024-11-21" && a.km === 170000)).toBe(false);
     expect(anchors.filter((a) => a.date === "2019-11-21")).toHaveLength(1);
     // реальные заправки 2025 стали точками рядом с подтверждёнными
     expect(anchors.some((a) => a.date === "2025-08-15" && a.km === 193304)).toBe(true);
@@ -396,5 +398,42 @@ describe("восстановление пробега по опорным точ
   test("запись вне диапазона точек остаётся без пробега — среднее не подставляется", () => {
     const early = [{ id: 1, date: "2015-01-01", km: null, paidTotal: 10 }];
     expect(applyFuelBatch(early, FILL, []).find((f) => f.id === 1).km).toBeNull();
+  });
+});
+
+describe("дворники 21.11.2024: пробег 170 000 → 175 200", () => {
+  const FIX = HISTORY_IMPORTS.find((b) => b.id === "wipers-2024-11-21-km");
+  const applyAll = (batches, fuel, service) =>
+    batches.reduce(
+      (acc, b) => ({ fuel: applyFuelBatch(acc.fuel, b, acc.service), service: applyServiceBatch(acc.service, b, acc.fuel) }),
+      { fuel, service }
+    );
+  const before = applyAll(HISTORY_IMPORTS.filter((b) => b !== FIX), migrateFuel(INITIAL_FUEL), migrateService(INITIAL_SERVICE));
+  const after = applyAll([FIX], before.fuel, before.service);
+  const wipers = (list) => list.find((s) => s.date === "2024-11-21" && s.type === "Щётки стеклоочистителя");
+
+  test("только эта запись меняется, и только пробег", () => {
+    expect(wipers(before.service).km).toBe(170000);
+    expect(wipers(after.service)).toEqual({ ...wipers(before.service), km: 175200 });
+    expect(after.service.filter((s) => s !== wipers(after.service)))
+      .toEqual(before.service.filter((s) => s !== wipers(before.service)));
+    expect(after.fuel).toEqual(before.fuel);
+  });
+
+  test("одометр больше не откатывается после 174 000 км", () => {
+    const all = [...after.fuel, ...after.service].filter((e) => e.km > 0)
+      .sort((a, b) => a.date.localeCompare(b.date) || a.km - b.km);
+    const back = [];
+    let max = 0;
+    all.forEach((e) => { if (e.km < max) back.push(`${e.date} ${e.km}`); else max = e.km; });
+    // остаётся только округление ТО 21.05.2026 (214 500 против заправки 14.05 на 214 503)
+    expect(back).toEqual(["2026-05-21 214500"]);
+    expect(mileagePoints(after.fuel, after.service).some((p) => p.date === "2024-11-21" && p.km === 175200)).toBe(true);
+  });
+
+  test("идемпотентно, а пробег, который пользователь уже поправил сам, не затирается", () => {
+    expect(applyServiceBatch(after.service, FIX, after.fuel)).toEqual(after.service);
+    const own = before.service.map((s) => (s === wipers(before.service) ? { ...s, km: 175000 } : s));
+    expect(wipers(applyServiceBatch(own, FIX, before.fuel)).km).toBe(175000);
   });
 });

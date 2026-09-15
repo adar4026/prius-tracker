@@ -510,6 +510,16 @@ export const HISTORY_IMPORTS = [
     id: "odometer-fill-2024",
     kmFill: true,
   },
+  {
+    // дворники 21.11.2024 стояли на 170 000 км — откат после шин 25.09.2024
+    // (174 000). Пробег той же даты у страховки и заправки — 175 200
+    // (интерполяция 25.09 → 24.01.2025); ставится тот же. 21.05.2026
+    // (214 500 против заправки 14.05 на 214 503) — округление, не трогается.
+    id: "wipers-2024-11-21-km",
+    servicePatches: [
+      { match: { date: "2024-11-21", type: "Щётки стеклоочистителя" }, when: { km: 170000 }, set: { km: 175200 } },
+    ],
+  },
 ];
 
 /* ---------------- слияние без дублей ---------------- */
@@ -619,8 +629,11 @@ export function applyServiceBatch(list, batch, fuel = []) {
     out = fillMissingKm(out, odometerAnchors(Array.isArray(fuel) ? fuel : [], out));
   }
 
+  // `when` — как у заправок: правка только для записи с ещё не изменёнными полями
   (batch.servicePatches || []).forEach((p) => {
-    out = out.map((s) => (matchesService(s, p.match) ? { ...s, ...p.set } : s));
+    const untouched = (s) =>
+      !p.when || Object.entries(p.when).every(([k, v]) => s[k] === v);
+    out = out.map((s) => (matchesService(s, p.match) && untouched(s) ? { ...s, ...p.set } : s));
   });
 
   (batch.serviceSplits || []).forEach((split) => {
