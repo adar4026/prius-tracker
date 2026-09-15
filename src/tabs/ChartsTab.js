@@ -15,6 +15,13 @@ import {
   monthlyExpenses, periodLabel, periodOptions, timeTicks, tsToISO,
 } from "../analytics";
 
+const MODES = [
+  { id: "consumption", label: "Расход" },
+  { id: "price", label: "Цена" },
+  { id: "months", label: "Месяцы" },
+  { id: "costs", label: "Затраты" },
+];
+
 const shortDate = (iso) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}`;
 
 // 220 000 → «220 тыс.», 220 500 → «220,5 тыс.» — компактная подпись оси км.
@@ -25,11 +32,13 @@ const kmTick = (v) =>
 const DAY_MS = 86400000;
 
 /**
- * Раздел «Графики». Один период на весь экран: выбранный год (или «Все»)
- * срезает заправки и записи ТО, а все графики и показатели ниже считаются
- * уже по этому срезу — по тем же формулам, что и раньше.
+ * Раздел «Графики»: переключатель режимов и один период на весь экран.
+ * Выбранный год (или «Все») срезает заправки и записи ТО, а все графики
+ * и показатели — в текущем режиме и в «Аналитике» ниже — считаются уже
+ * по этому срезу, по тем же формулам, что и раньше.
  */
 export default function ChartsTab({ fuel, service, theme }) {
+  const [mode, setMode] = useState("consumption");
   const [period, setPeriod] = useState("all");
   const c = chartColors(theme);
 
@@ -142,14 +151,33 @@ export default function ChartsTab({ fuel, service, theme }) {
 
   return (
     <main className="screen screen--charts">
+      <div className="seg">
+        {MODES.map((m) => (
+          <button
+            key={m.id}
+            className={mode === m.id ? "active" : ""}
+            onClick={() => setMode(m.id)}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+
+      {/* общий период: действует на текущий режим и на «Аналитику» ниже */}
+      <div className="filter-row" style={{ paddingTop: 0 }}>
+        <FilterMenu name="Период" title="Период" value={activePeriod} options={options} onChange={setPeriod} />
+        <span className="analytic__scope">{periodText} · все графики раздела</span>
+      </div>
+
       {/* ---------- расход топлива ---------- */}
 
-      <div className="section-title">Расход топлива</div>
-      {!consumption.length ? (
+      {mode === "consumption" && !consumption.length && (
         <div className="card">
           <div className="empty">Недостаточно данных для расчёта расхода</div>
         </div>
-      ) : (
+      )}
+
+      {mode === "consumption" && consumption.length > 0 && (
         <div className="card chart-card">
           <ResponsiveContainer width="100%" height={250}>
             <LineChart data={consumption} margin={{ top: 10, right: 12, left: -18, bottom: 0 }}>
@@ -182,40 +210,37 @@ export default function ChartsTab({ fuel, service, theme }) {
         </div>
       )}
 
-      <div className="grid-2" style={{ marginTop: 10 }}>
-        <div className="card stat">
-          <div className="stat__label">Минимум</div>
-          <div className="stat__value" style={{ color: "var(--green)" }}>
-            {fmtNum(minConsumption, 2)}
-            <span className="stat__unit">л/100 км</span>
+      {mode === "consumption" && (
+        <>
+          <div className="grid-2" style={{ marginTop: 10 }}>
+            <div className="card stat">
+              <div className="stat__label">Минимум</div>
+              <div className="stat__value" style={{ color: "var(--green)" }}>
+                {fmtNum(minConsumption, 2)}
+                <span className="stat__unit">л/100 км</span>
+              </div>
+            </div>
+            <div className="card stat">
+              <div className="stat__label">Максимум</div>
+              <div className="stat__value" style={{ color: "var(--red)" }}>
+                {fmtNum(maxConsumption, 2)}
+                <span className="stat__unit">л/100 км</span>
+              </div>
+            </div>
           </div>
-        </div>
-        <div className="card stat">
-          <div className="stat__label">Максимум</div>
-          <div className="stat__value" style={{ color: "var(--red)" }}>
-            {fmtNum(maxConsumption, 2)}
-            <span className="stat__unit">л/100 км</span>
+          <div className="hint" style={{ padding: "0 2px" }}>
+            Заправки «не до полного» в расчёте не участвуют.
           </div>
-        </div>
-      </div>
-      <div className="hint" style={{ padding: "0 2px" }}>
-        Заправки «не до полного» в расчёте не участвуют.
-      </div>
-
-      {/* ---------- общий период ---------- */}
-
-      <div className="section-title">Аналитика</div>
-      <div className="filter-row" style={{ paddingTop: 0 }}>
-        <FilterMenu name="Период" title="Период" value={activePeriod} options={options} onChange={setPeriod} />
-        <span className="analytic__scope">{periodText} · все графики раздела</span>
-      </div>
+        </>
+      )}
 
       {/* ---------- цена ---------- */}
 
-      <div className="section-title">Цена топлива</div>
-      {!prices.length ? (
+      {mode === "price" && !prices.length && (
         <div className="card"><div className="empty">Нет заправок за период</div></div>
-      ) : (
+      )}
+
+      {mode === "price" && prices.length > 0 && (
         <>
           <div className="card chart-card">
             <ResponsiveContainer width="100%" height={250}>
@@ -260,11 +285,13 @@ export default function ChartsTab({ fuel, service, theme }) {
 
       {/* ---------- месяцы ---------- */}
 
-      <div className="section-title">Средний расход по месяцам</div>
-      {!months.length ? (
+      {mode === "months" && !months.length && (
         <div className="card"><div className="empty">Нет заправок за период</div></div>
-      ) : (
+      )}
+
+      {mode === "months" && months.length > 0 && (
         <>
+          <div className="section-title">Средний расход по месяцам</div>
           <div className="card chart-card">
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={months} margin={{ top: 6, right: 12, left: -18, bottom: 0 }}>
@@ -335,10 +362,11 @@ export default function ChartsTab({ fuel, service, theme }) {
 
       {/* ---------- затраты ---------- */}
 
-      <div className="section-title">Затраты</div>
-      {totalCosts === 0 ? (
+      {mode === "costs" && totalCosts === 0 && (
         <div className="card"><div className="empty">Нет данных о расходах за период</div></div>
-      ) : (
+      )}
+
+      {mode === "costs" && totalCosts > 0 && (
         <>
           <div className="card hero">
             <div className="hero__label">Всего расходов</div>
@@ -367,10 +395,10 @@ export default function ChartsTab({ fuel, service, theme }) {
         </>
       )}
 
-      {/* ---------- пробег ---------- */}
+      {/* ---------- аналитика: пробег и расходы по месяцам ---------- */}
 
-      {/* карточки аналитики сами себя подписывают — заголовок раздела не нужен */}
-      <div className="card chart-card" style={{ marginTop: 22 }}>
+      <div className="section-title">Аналитика</div>
+      <div className="card chart-card">
         <div className="analytic__head">
           <div className="hero__label">Пробег</div>
           <div className="analytic__period">{periodText}</div>
