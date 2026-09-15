@@ -4,11 +4,16 @@ import {
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import Stat from "../components/Stat";
+import FilterMenu from "../components/FilterMenu";
 import { chartColors } from "../themes";
 import {
-  avg, byKmAsc, consumptionPoints, fmtMoney, fmtNum, isFull, monthLabel, num,
-  numOrNull,
+  avg, byKmAsc, consumptionPoints, fmtDate, fmtKm, fmtMoney, fmtNum, isFull,
+  monthLabel, num, numOrNull, yearsOf,
 } from "../utils";
+import {
+  avgKmPerDay, expenseEntries, inPeriod, kmTicks, mileagePoints, monthTicks,
+  monthlyExpenses, periodLabel, timeTicks, tsToISO,
+} from "../analytics";
 
 const MODES = [
   { id: "consumption", label: "Расход" },
@@ -19,8 +24,17 @@ const MODES = [
 
 const shortDate = (iso) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}`;
 
+// 220 000 → «220 тыс.», 220 500 → «220,5 тыс.» — компактная подпись оси км.
+// Пробел неразрывный: по обычному recharts переносит подпись на две строки.
+const kmTick = (v) =>
+  `${v % 1000 === 0 ? Math.round(v / 1000) : fmtNum(v / 1000, 1)}\u00a0тыс.`;
+
+const DAY_MS = 86400000;
+
 export default function ChartsTab({ fuel, service, theme }) {
   const [mode, setMode] = useState("consumption");
+  // период аналитических карточек — та же модель, что «Период» в журналах
+  const [period, setPeriod] = useState("all");
   const c = chartColors(theme);
 
   const tooltipStyle = {
@@ -77,6 +91,42 @@ export default function ChartsTab({ fuel, service, theme }) {
   const totalService = useMemo(() => service.reduce((s, r) => s + num(r.cost), 0), [service]);
   const totalCosts = totalFuel + totalService;
   const fuelShare = totalCosts > 0 ? Math.round((totalFuel / totalCosts) * 100) : 0;
+
+  /* ---------------- аналитика: пробег и расходы по месяцам ---------------- */
+
+  const periodOptions = useMemo(
+    () => [
+      { id: "all", label: "Все записи", shortLabel: "Все" },
+      ...yearsOf(fuel, service).map((y) => ({ id: y, label: y })),
+    ],
+    [fuel, service]
+  );
+  // выбранный год мог исчезнуть после удаления записей
+  const activePeriod = periodOptions.some((o) => o.id === period) ? period : "all";
+
+  const allMileage = useMemo(() => mileagePoints(fuel, service), [fuel, service]);
+  const mileage = useMemo(
+    () => allMileage.filter((p) => inPeriod(p, activePeriod)),
+    [allMileage, activePeriod]
+  );
+  const kmPerDay = useMemo(() => avgKmPerDay(mileage), [mileage]);
+  const mileageAxis = useMemo(() => {
+    if (!mileage.length) return { domain: [0, 1], y: kmTicks(NaN, NaN), ticks: [], format: () => "" };
+    let min = mileage[0].ts;
+    let max = mileage[mileage.length - 1].ts;
+    // одна точка: без искусственной ширины оси recharts не строит шкалу
+    if (min === max) { min -= DAY_MS; max += DAY_MS; }
+    const y = kmTicks(mileage[0].km, mileage[mileage.length - 1].km);
+    return { domain: [min, max], y, ...timeTicks(min, max) };
+  }, [mileage]);
+
+  const expenses = useMemo(() => expenseEntries(fuel, service), [fuel, service]);
+  const monthly = useMemo(() => monthlyExpenses(expenses, activePeriod), [expenses, activePeriod]);
+  const monthlyAxis = useMemo(
+    () => monthTicks(monthly.months.map((m) => m.key)),
+    [monthly]
+  );
+  const spentPeriodLabel = periodLabel(activePeriod);
 
   return (
     <main className="screen">
@@ -303,6 +353,91 @@ export default function ChartsTab({ fuel, service, theme }) {
           </div>
         </>
       )}
+
+      <div className="section-title">Аналитика</div>
+      <div className="filter-row" style={{ paddingTop: 0 }}>
+        <FilterMenu name="Период" title="Период" value={activePeriod} options={periodOptions} onChange={setPeriod} />
+      </div>
+
+      <div className="card chart-card">
+        <div className="analytic__head">
+          <div className="hero__label">Пробег</div>
+          <div className="analytic__period">{spentPeriodLabel}</div>
+        </div>
+        <div className="analytic__value">
+          В среднем в сутки:
+          <b>{kmPerDay === null ? "—" : `${fmtKm(kmPerDay)} км`}</b>
+        </div>
+        {mileage.length === 0 ? (
+          <div className="analytic__empty">Нет записей с пробегом за период</div>
+        ) : (
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={mileage} margin={{ top: 10, right: 14, left: -6, bottom: 0 }}>
+              <CartesianGrid stroke={c.grid} strokeDasharray="3 3" vertical={false} />
+              <XAxis
+                dataKey="ts" type="number" domain={mileageAxis.domain}
+                ticks={mileageAxis.ticks} tickFormatter={mileageAxis.format}
+                {...axisProps} minTickGap={12}
+              />
+              <YAxis
+                domain={mileageAxis.y.domain} ticks={mileageAxis.y.ticks}
+                {...axisProps} width={62} tickFormatter={kmTick}
+              />
+              <Tooltip
+                contentStyle={tooltipStyle}
+                labelStyle={{ color: c.axis }}
+                labelFormatter={(ts) => fmtDate(tsToISO(ts))}
+                formatter={(v) => [`${fmtKm(v)} км`, "Пробег"]}
+              />
+              <Line
+                type="monotone" dataKey="km" stroke={c.teal} strokeWidth={2.4}
+                dot={mileage.length <= 40 ? { r: 2.4, fill: c.teal, strokeWidth: 0 } : false}
+                activeDot={{ r: 5 }} isAnimationActive={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+        <div className="chart-legend">
+          <span><i className="dot" style={{ background: c.teal }} /> одометр, км · заправки и ТО</span>
+        </div>
+      </div>
+
+      <div className="card chart-card">
+        <div className="analytic__head">
+          <div className="hero__label">Ежемесячные затраты</div>
+          <div className="analytic__period">{spentPeriodLabel}</div>
+        </div>
+        <div className="analytic__value">
+          В среднем в мес.:
+          <b>{fmtMoney(monthly.avgPerMonth)}</b>
+        </div>
+        {monthly.months.length === 0 ? (
+          <div className="analytic__empty">Нет расходов за период</div>
+        ) : (
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={monthly.months} margin={{ top: 10, right: 14, left: -12, bottom: 0 }} barCategoryGap="20%">
+              <CartesianGrid stroke={c.grid} strokeDasharray="3 3" vertical={false} />
+              <XAxis
+                dataKey="key" ticks={monthlyAxis.ticks} tickFormatter={monthlyAxis.format}
+                {...axisProps} interval={0}
+              />
+              <YAxis {...axisProps} width={52} tickFormatter={(v) => Math.round(v)} />
+              <Tooltip
+                cursor={{ fill: c.grid, opacity: 0.35 }}
+                contentStyle={tooltipStyle}
+                labelStyle={{ color: c.axis }}
+                labelFormatter={(key) => monthLabel(`${key}-01`)}
+                formatter={(v) => [fmtMoney(v), "Расходы"]}
+              />
+              <Bar dataKey="total" fill={c.teal} radius={[3, 3, 0, 0]} isAnimationActive={false} />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+        <div className="chart-legend">
+          <span><i className="dot" style={{ background: c.teal }} /> топливо + ТО и покупки, €</span>
+          <span>всего {fmtMoney(monthly.total, 0)}</span>
+        </div>
+      </div>
     </main>
   );
 }

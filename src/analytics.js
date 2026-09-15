@@ -1,0 +1,283 @@
+// Аналитика для раздела «Графики»: история пробега и расходы по месяцам.
+// Только чистые функции над уже существующими данными — заправками и
+// записями ТО. Ничего не хранится, всё пересчитывается от текущих списков.
+
+import { MONTHS_SHORT, entryYear, monthLabel, numOrNull, todayISO } from "./utils";
+
+const DAY_MS = 86400000;
+
+/** Дата вида YYYY-MM-DD, которая действительно существует в календаре. */
+export const isValidISODate = (iso) => {
+  if (typeof iso !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
+  const [y, m, d] = iso.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
+};
+
+/** Полночь даты по UTC в миллисекундах — ось времени графика пробега. */
+export const isoToTs = (iso) => {
+  const [y, m, d] = iso.split("-").map(Number);
+  return Date.UTC(y, m - 1, d);
+};
+
+export const tsToISO = (ts) => new Date(ts).toISOString().slice(0, 10);
+
+/** Календарных дней между датами (later − earlier). */
+export const daysBetween = (earlierISO, laterISO) =>
+  Math.round((isoToTs(laterISO) - isoToTs(earlierISO)) / DAY_MS);
+
+/* ---------------- периоды ---------------- */
+
+/**
+ * Период раздела — тот же, что в журналах: "all" или год строкой ("2026").
+ * Запись попадает в период по году даты.
+ */
+export const inPeriod = (entry, period) =>
+  period === "all" || entryYear(entry) === period;
+
+export const periodLabel = (period) =>
+  period === "all" ? "За всё время" : `За ${period} год`;
+
+/* ---------------- пробег ---------------- */
+
+/**
+ * Точки истории одометра из всех записей с достоверной датой и пробегом:
+ * заправки и ТО. Пробег 0/null означает «неизвестен» и точкой не становится.
+ *
+ * Точки сортируются по дате (внутри дня — по пробегу), дубли одинаковых
+ * дата+пробег из разных источников схлопываются, а запись, у которой пробег
+ * меньше уже достигнутого (обычно округлённый пробег в старой записи ТО),
+ * пропускается — одометр не уменьшается. Промежуточных значений нет:
+ * график показывает только то, что действительно записано.
+ */
+export function mileagePoints(fuel = [], service = []) {
+  const raw = [];
+  const collect = (list) =>
+    (Array.isArray(list) ? list : []).forEach((e) => {
+      if (!e || !isValidISODate(e.date)) return;
+      const km = numOrNull(e.km);
+      if (km === null || km <= 0) return;
+      raw.push({ date: e.date, km: Math.round(km) });
+    });
+  collect(fuel);
+  collect(service);
+
+  raw.sort((a, b) => a.date.localeCompare(b.date) || a.km - b.km);
+
+  const out = [];
+  const seen = new Set();
+  let maxKm = -Infinity;
+  raw.forEach((p) => {
+    const key = `${p.date}|${p.km}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    if (p.km < maxKm) return;
+    maxKm = p.km;
+    out.push({ date: p.date, km: p.km, ts: isoToTs(p.date) });
+  });
+  return out;
+}
+
+/**
+ * Средний пробег в сутки за диапазон точек:
+ * (последний пробег − первый пробег) / календарных дней между ними.
+ * Меньше двух точек или все точки в один день — null (показывается «—»).
+ * Округляется до целых км.
+ */
+export function avgKmPerDay(points) {
+  if (!Array.isArray(points) || points.length < 2) return null;
+  const first = points[0];
+  const last = points[points.length - 1];
+  const days = daysBetween(first.date, last.date);
+  if (!(days > 0)) return null;
+  const value = Math.round((last.km - first.km) / days);
+  return Number.isFinite(value) ? value : null;
+}
+
+/* ---------------- расходы по месяцам ---------------- */
+
+/**
+ * Фактические расходы в том же виде, в каком их суммирует приложение:
+ * заправка — оплаченная сумма paidTotal, запись ТО/покупки — cost.
+ * Запись без суммы (null) расхода не даёт, но дату свою в историю вносит:
+ * она нужна, чтобы определить начало диапазона «за всё время».
+ * Задачи (напоминания) расходами не являются и сюда не попадают.
+ */
+export function expenseEntries(fuel = [], service = []) {
+  const out = [];
+  (Array.isArray(fuel) ? fuel : []).forEach((f) => {
+    if (!f || !isValidISODate(f.date)) return;
+    out.push({ date: f.date, amount: numOrNull(f.paidTotal), kind: "fuel" });
+  });
+  (Array.isArray(service) ? service : []).forEach((s) => {
+    if (!s || !isValidISODate(s.date)) return;
+    out.push({ date: s.date, amount: numOrNull(s.cost), kind: "service" });
+  });
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+const monthKey = (iso) => iso.slice(0, 7);
+
+const shiftMonth = (key, delta) => {
+  const [y, m] = key.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + delta, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+};
+
+/** Все календарные месяцы от from до to включительно: ["2025-11", "2025-12", …]. */
+export function monthRange(from, to) {
+  if (!from || !to || from > to) return [];
+  const out = [];
+  for (let k = from; k <= to; k = shiftMonth(k, 1)) out.push(k);
+  return out;
+}
+
+/**
+ * Границы диапазона месяцев для периода.
+ *   all  — от месяца первой записи до текущего месяца (или до месяца
+ *          последней записи, если она датирована позже);
+ *   год  — с января по декабрь; для текущего года — по текущий месяц,
+ *          будущие месяцы в диапазон не входят.
+ * Без записей за период — null.
+ */
+export function periodMonthBounds(entries, period, today = todayISO()) {
+  const dated = entries.filter((e) => inPeriod(e, period)).map((e) => monthKey(e.date));
+  if (!dated.length) return null;
+  const first = dated.reduce((a, b) => (a < b ? a : b));
+  const last = dated.reduce((a, b) => (a > b ? a : b));
+  const current = monthKey(today);
+
+  if (period === "all") return { from: first, to: last > current ? last : current };
+
+  const from = `${period}-01`;
+  const dec = `${period}-12`;
+  let to = dec;
+  if (current < dec && current >= from) to = current;
+  if (last > to) to = last;
+  return { from, to };
+}
+
+/**
+ * Расходы по календарным месяцам выбранного периода. Каждый месяц диапазона
+ * присутствует в списке, даже если трат в нём не было (0 €).
+ *
+ * Средняя сумма в месяц = сумма фактических расходов / число календарных
+ * месяцев диапазона (включая нулевые). Без записей — total 0, avg null.
+ */
+export function monthlyExpenses(entries, period, today = todayISO()) {
+  const bounds = periodMonthBounds(entries, period, today);
+  if (!bounds) return { months: [], total: 0, avgPerMonth: null };
+
+  const sums = new Map();
+  entries.forEach((e) => {
+    if (!inPeriod(e, period) || e.amount === null || !Number.isFinite(e.amount)) return;
+    const key = monthKey(e.date);
+    sums.set(key, (sums.get(key) || 0) + e.amount);
+  });
+
+  const months = monthRange(bounds.from, bounds.to).map((key) => ({
+    key,
+    label: monthLabel(`${key}-01`),
+    total: Math.round((sums.get(key) || 0) * 100) / 100,
+  }));
+  const total = Math.round(months.reduce((s, m) => s + m.total, 0) * 100) / 100;
+  const avgPerMonth = months.length ? total / months.length : null;
+  return { months, total, avgPerMonth };
+}
+
+/* ---------------- подписи осей ---------------- */
+
+const KM_STEPS = [500, 1000, 2000, 5000, 10000, 20000, 50000, 100000];
+
+/**
+ * Деления оси пробега: круглый шаг (500 км, 1, 2, 5, 10… тыс.), при котором
+ * подписей не больше max (по умолчанию шесть). Домен расширяется до ближайших делений, поэтому
+ * подписи всегда «220 тыс.», а не «214,5 тыс.» с тремя цифрами после запятой.
+ */
+export function kmTicks(minKm, maxKm, max = 6) {
+  if (!Number.isFinite(minKm) || !Number.isFinite(maxKm) || maxKm < minKm) {
+    return { ticks: [], domain: [0, 1] };
+  }
+  // делений между округлёнными вниз/вверх границами — с учётом самого округления
+  const count = (s) => Math.ceil(maxKm / s) - Math.floor(minKm / s) + 1;
+  let step = KM_STEPS.find((s) => count(s) <= max) || KM_STEPS[KM_STEPS.length - 1];
+  while (count(step) > max) step *= 2;
+  const from = Math.floor(minKm / step) * step;
+  const to = Math.ceil(maxKm / step) * step;
+  const ticks = [];
+  for (let v = from; v <= to; v += step) ticks.push(v);
+  return { ticks, domain: [from, to === from ? from + step : to] };
+}
+
+/** Каждый n-й элемент, чтобы подписей было не больше max. */
+const thin = (list, max) => {
+  if (list.length <= max) return list;
+  const step = Math.ceil(list.length / max);
+  return list.filter((_, i) => i % step === 0);
+};
+
+/**
+ * Подписи оси X для помесячного графика: пока месяцев немного — сами
+ * месяцы («янв 26»), на длинных диапазонах — только январи как годы.
+ * Возвращает список ключей для ticks и форматтер подписи.
+ */
+export function monthTicks(keys, max = 7) {
+  if (keys.length > 24) {
+    const januaries = keys.filter((k) => k.endsWith("-01"));
+    return {
+      ticks: thin(januaries.length ? januaries : keys, max),
+      format: (k) => k.slice(0, 4),
+    };
+  }
+  return { ticks: thin(keys, max), format: (k) => monthLabel(`${k}-01`) };
+}
+
+/**
+ * Подписи оси времени для графика пробега по диапазону в миллисекундах:
+ * больше двух лет — годы, больше трёх месяцев — месяцы, иначе дни.
+ */
+export function timeTicks(minTs, maxTs, max = 6) {
+  if (!Number.isFinite(minTs) || !Number.isFinite(maxTs) || maxTs < minTs) {
+    return { ticks: [], format: () => "" };
+  }
+  const spanDays = (maxTs - minTs) / DAY_MS;
+  const start = new Date(minTs);
+
+  if (spanDays > 730) {
+    const ticks = [];
+    for (let y = start.getUTCFullYear(); ; y++) {
+      const t = Date.UTC(y, 0, 1);
+      if (t > maxTs) break;
+      if (t >= minTs) ticks.push(t);
+    }
+    return { ticks: thin(ticks, max), format: (t) => String(new Date(t).getUTCFullYear()) };
+  }
+
+  if (spanDays > 90) {
+    const ticks = [];
+    const y = start.getUTCFullYear();
+    for (let m = start.getUTCMonth(); ; m++) {
+      const t = Date.UTC(y, m, 1);
+      if (t > maxTs) break;
+      if (t >= minTs) ticks.push(t);
+    }
+    return {
+      ticks: thin(ticks, max),
+      format: (t) => {
+        const d = new Date(t);
+        return `${MONTHS_SHORT[d.getUTCMonth()]} ${String(d.getUTCFullYear()).slice(2)}`;
+      },
+    };
+  }
+
+  const stepDays = Math.max(1, Math.ceil(spanDays / max));
+  const ticks = [];
+  for (let t = minTs; t <= maxTs; t += stepDays * DAY_MS) ticks.push(t);
+  return {
+    ticks,
+    format: (t) => {
+      const iso = tsToISO(t);
+      return `${iso.slice(8, 10)}.${iso.slice(5, 7)}`;
+    },
+  };
+}

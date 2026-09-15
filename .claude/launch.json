@@ -4,9 +4,12 @@
     {
       "name": "autocontrol",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["start"],
+      "runtimeArgs": [
+        "start"
+      ],
       "port": 3000,
-      "url": "http://localhost:3000"
+      "url": "http://localhost:3000",
+      "autoPort": true
     }
   ]
 }

@@ -16,5 +16,8 @@ export function chartColors(theme) {
   const data = theme === "light"
     ? { gold: "#b8901c", green: "#2e9a72", red: "#d94f4f", blue: "#4f7fc2" }
     : { gold: "#d4af37", green: "#4caf8a", red: "#ff6b6b", blue: "#7b9fd4" };
-  return { grid, axis, tooltipBg, text, ...data };
+  // бирюзовый — акцент светлой темы (--accent); в тёмных темах чуть светлее,
+  // чтобы линия читалась на тёмной карточке
+  const teal = { dark: "#5cc8d2", light: "#0e7c86", sepia: "#1f7f88" }[theme];
+  return { grid, axis, tooltipBg, text, teal, ...data };
 }
