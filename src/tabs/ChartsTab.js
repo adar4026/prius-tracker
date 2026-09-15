@@ -32,10 +32,11 @@ const kmTick = (v) =>
 const DAY_MS = 86400000;
 
 /**
- * Раздел «Графики»: переключатель режимов и один период на весь экран.
- * Выбранный год (или «Все») срезает заправки и записи ТО, а все графики
- * и показатели — в текущем режиме и в «Аналитике» ниже — считаются уже
- * по этому срезу, по тем же формулам, что и раньше.
+ * Раздел «Графики»: переключатель режимов. Период («Все» или год) относится
+ * к режиму «Расход»: он срезает заправки и записи ТО (fuelP/serviceP), и по
+ * этому срезу считаются график расхода, минимум/максимум и «Аналитика».
+ * Режимы «Цена», «Месяцы» и «Затраты» работают с исходными списками и от
+ * периода не зависят. Выбор сохраняется при переключении режимов.
  */
 export default function ChartsTab({ fuel, service, theme }) {
   const [mode, setMode] = useState("consumption");
@@ -62,7 +63,7 @@ export default function ChartsTab({ fuel, service, theme }) {
   const activePeriod = options.some((o) => o.id === period) ? period : "all";
   const periodText = periodLabel(activePeriod);
 
-  // единственный срез по периоду — дальше все расчёты работают с ним
+  // срез по периоду для режима «Расход» и его аналитики
   const fuelP = useMemo(() => filterPeriod(fuel, activePeriod), [fuel, activePeriod]);
   const serviceP = useMemo(() => filterPeriod(service, activePeriod), [service, activePeriod]);
 
@@ -90,11 +91,11 @@ export default function ChartsTab({ fuel, service, theme }) {
   // заправки с неизвестной ценой на график не попадают — иначе это ноль в ряду
   const prices = useMemo(
     () =>
-      [...fuelP]
+      [...fuel]
         .sort(byKmAsc)
         .filter((f) => numOrNull(f.pricePerL) !== null)
         .map((f) => ({ label: shortDate(f.date), price: num(f.pricePerL) })),
-    [fuelP]
+    [fuel]
   );
   const avgPrice = useMemo(() => avg(prices.map((p) => p.price)), [prices]);
 
@@ -102,7 +103,7 @@ export default function ChartsTab({ fuel, service, theme }) {
 
   const months = useMemo(() => {
     const map = new Map();
-    [...fuelP].sort(byKmAsc).forEach((f) => {
+    [...fuel].sort(byKmAsc).forEach((f) => {
       const key = f.date.slice(0, 7);
       if (!map.has(key)) map.set(key, { key, label: monthLabel(f.date), spent: 0, liters: 0, fills: 0, cons: [] });
       const m = map.get(key);
@@ -114,15 +115,15 @@ export default function ChartsTab({ fuel, service, theme }) {
     return [...map.values()]
       .sort((a, b) => a.key.localeCompare(b.key))
       .map((m) => ({ ...m, avgCons: m.cons.length ? avg(m.cons) : null }));
-  }, [fuelP]);
+  }, [fuel]);
   // на длинном диапазоне подписи месяцев прореживаются, иначе они наезжают
   const monthsAxis = useMemo(() => monthTicks(months.map((m) => m.key)), [months]);
 
   /* ---------------- затраты ---------------- */
 
   // итоговые суммы — те же, что раньше стояли на главной
-  const totalFuel = useMemo(() => fuelP.reduce((s, f) => s + num(f.paidTotal), 0), [fuelP]);
-  const totalService = useMemo(() => serviceP.reduce((s, r) => s + num(r.cost), 0), [serviceP]);
+  const totalFuel = useMemo(() => fuel.reduce((s, f) => s + num(f.paidTotal), 0), [fuel]);
+  const totalService = useMemo(() => service.reduce((s, r) => s + num(r.cost), 0), [service]);
   const totalCosts = totalFuel + totalService;
   const fuelShare = totalCosts > 0 ? Math.round((totalFuel / totalCosts) * 100) : 0;
 
@@ -164,6 +165,14 @@ export default function ChartsTab({ fuel, service, theme }) {
       </div>
 
       {/* ---------- расход топлива ---------- */}
+
+      {/* период режима «Расход»: график, минимум/максимум и аналитика ниже */}
+      {mode === "consumption" && (
+        <div className="filter-row" style={{ paddingTop: 0 }}>
+          <FilterMenu name="Период" title="Период" value={activePeriod} options={options} onChange={setPeriod} />
+          <span className="analytic__scope">{periodText}</span>
+        </div>
+      )}
 
       {mode === "consumption" && !consumption.length && (
         <div className="card">
@@ -231,7 +240,7 @@ export default function ChartsTab({ fuel, service, theme }) {
       {/* ---------- цена ---------- */}
 
       {mode === "price" && !prices.length && (
-        <div className="card"><div className="empty">Нет заправок за период</div></div>
+        <div className="card"><div className="empty">Нет заправок</div></div>
       )}
 
       {mode === "price" && prices.length > 0 && (
@@ -280,7 +289,7 @@ export default function ChartsTab({ fuel, service, theme }) {
       {/* ---------- месяцы ---------- */}
 
       {mode === "months" && !months.length && (
-        <div className="card"><div className="empty">Нет заправок за период</div></div>
+        <div className="card"><div className="empty">Нет заправок</div></div>
       )}
 
       {mode === "months" && months.length > 0 && (
@@ -357,7 +366,7 @@ export default function ChartsTab({ fuel, service, theme }) {
       {/* ---------- затраты ---------- */}
 
       {mode === "costs" && totalCosts === 0 && (
-        <div className="card"><div className="empty">Нет данных о расходах за период</div></div>
+        <div className="card"><div className="empty">Нет данных о расходах</div></div>
       )}
 
       {mode === "costs" && totalCosts > 0 && (
@@ -365,7 +374,7 @@ export default function ChartsTab({ fuel, service, theme }) {
           <div className="card hero">
             <div className="hero__label">Всего расходов</div>
             <div className="hero__value">{fmtMoney(totalCosts, 0)}</div>
-            <div className="hero__note">Топливо + ТО и ремонт · {periodText.toLowerCase()}</div>
+            <div className="hero__note">Топливо + ТО и ремонт</div>
           </div>
 
           <div className="grid-2" style={{ marginTop: 10 }}>
@@ -394,12 +403,6 @@ export default function ChartsTab({ fuel, service, theme }) {
       {mode === "consumption" && (
         <>
           <div className="section-title">Аналитика</div>
-          {/* период выбирается здесь, но срезает все графики раздела */}
-          <div className="filter-row" style={{ paddingTop: 0 }}>
-            <FilterMenu name="Период" title="Период" value={activePeriod} options={options} onChange={setPeriod} />
-            <span className="analytic__scope">{periodText} · все графики раздела</span>
-          </div>
-
           <div className="card chart-card">
             <div className="analytic__head">
               <div className="hero__label">Пробег</div>
