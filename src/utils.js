@@ -79,6 +79,10 @@ export const todayISO = () => new Date().toISOString().slice(0, 10);
 export const byKmAsc = (a, b) => a.km - b.km || a.date.localeCompare(b.date);
 export const byDateDesc = (a, b) => b.date.localeCompare(a.date) || b.km - a.km;
 
+// Сводка «Месяцы»: свежие сверху. Сравниваем ключ «ГГГГ-ММ», а не подпись
+// месяца («янв», «фев» …), иначе строки перемешает алфавитная сортировка.
+export const byMonthKeyDesc = (a, b) => b.key.localeCompare(a.key);
+
 export const nextId = (list) =>
   list.reduce((max, item) => Math.max(max, item.id || 0), 0) + 1;
 

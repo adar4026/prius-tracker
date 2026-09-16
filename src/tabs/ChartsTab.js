@@ -7,7 +7,7 @@ import Stat from "../components/Stat";
 import FilterMenu from "../components/FilterMenu";
 import { chartColors } from "../themes";
 import {
-  avg, byKmAsc, consumptionPoints, fmtDate, fmtKm, fmtMoney, fmtNum, isFull,
+  avg, byKmAsc, byMonthKeyDesc, consumptionPoints, fmtDate, fmtKm, fmtMoney, fmtNum, isFull,
   MONTHS_SHORT, monthLabel, monthLabelFull, num, numOrNull,
 } from "../utils";
 import {
@@ -129,6 +129,9 @@ export default function ChartsTab({ fuel, service, theme }) {
   // на длинном диапазоне подписи месяцев прореживаются, иначе они наезжают
   const monthsAxis = useMemo(() => monthTicks(months.map((m) => m.key)), [months]);
   const hasApproxMonth = useMemo(() => months.some((m) => m.isApprox), [months]);
+  // только для таблицы «Сводка»: свежий месяц сверху, графики выше остаются
+  // в хронологическом порядке слева направо на исходном массиве months
+  const monthsDesc = useMemo(() => [...months].sort(byMonthKeyDesc), [months]);
 
   /* ---------------- затраты ---------------- */
 
@@ -417,7 +420,7 @@ export default function ChartsTab({ fuel, service, theme }) {
                 </tr>
               </thead>
               <tbody>
-                {months.map((m) => (
+                {monthsDesc.map((m) => (
                   <tr key={m.key}>
                     <td>{m.label}</td>
                     <td>{m.fills}</td>
