@@ -243,12 +243,11 @@ export default function App() {
     <div className={`app ${immersive ? "app--immersive" : ""}`}>
       {immersive && (
         <div className="home-ambient" aria-hidden="true">
-          <span className="ambient-blob blob-1" />
-          <span className="ambient-blob blob-2" />
-          <span className="ambient-blob blob-3" />
-          <span className="ambient-blob blob-4" />
-          <span className="ambient-sheen" />
-          <span className="ambient-fade" />
+          <span className="ambient-glow glow-1" />
+          <span className="ambient-glow glow-2" />
+          <span className="ambient-ribbon ribbon-a" />
+          <span className="ambient-ribbon ribbon-b" />
+          <span className="ambient-ribbon ribbon-c" />
         </div>
       )}
       {page === "vehicle" && (

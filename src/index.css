@@ -30,17 +30,17 @@
   --nav-active: #b39cff;
   --nav-active-soft: rgba(139, 110, 255, 0.22);
 
-  /* immersive hero Главной (по мотивам Lex Finance): fluid-фон из бирюзовых/голубых
-     пятен под прозрачной шапкой и показателями; в тёмной теме — приглушённый */
-  --hero-h: 380px;                              /* высота сцены с blob'ами (включая шапку) */
+  /* immersive hero Главной: живой flowing-фон (aurora ribbons + glow) под прозрачной
+     шапкой и показателями; в тёмной теме — приглушённый. Холодная автомобильная
+     палитра (teal/light blue/icy white) — своя, отдельная от Lex Finance. */
+  --hero-h: 380px;                              /* высота сцены (включая шапку), строго клипуется */
   --hero-top: #0f181b;                          /* верх сцены */
   --hero-bottom: var(--bg);                     /* базовый фон под остальными карточками */
-  --hero-glow: rgba(90, 190, 200, 0.10);        /* свечение сверху */
-  --hero-b1: rgba(14, 150, 162, 0.32);          /* teal — доминанта */
-  --hero-b2: rgba(90, 170, 230, 0.20);          /* light blue */
-  --hero-b3: rgba(150, 210, 220, 0.10);         /* icy highlight */
-  --hero-b4: rgba(10, 105, 125, 0.30);          /* deep teal */
-  --hero-sheen: rgba(255, 255, 255, 0.05);
+  --hero-glow: rgba(90, 190, 200, 0.10);        /* glow 1: мягкое свечение сверху */
+  --hero-glow-2: rgba(10, 105, 125, 0.26);      /* glow 2: глубина в углу */
+  --hero-ribbon-a: rgba(14, 150, 162, 0.30);    /* ribbon A: teal — доминанта */
+  --hero-ribbon-b: rgba(90, 170, 230, 0.20);    /* ribbon B: light blue */
+  --hero-ribbon-c: rgba(190, 228, 232, 0.16);   /* ribbon C: ледяная подсветка */
   --hero-glass: rgba(255, 255, 255, 0.08);
   --hero-glass-border: rgba(255, 255, 255, 0.14);
   --hero-glass-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
@@ -76,15 +76,15 @@ html[data-theme="light"] {
   --nav-active: #6d4de6;
   --nav-active-soft: #ece7fd;
 
-  /* светлая основа + бирюзовый акцент Lexcar: мягкие голубые/мятные переливы */
+  /* светлая основа + бирюзовый акцент Lexcar: холодная автомобильная палитра —
+     light blue / teal / icy white, чуть глубокого синего для глубины */
   --hero-top: #d9ecf4;                          /* icy white-blue */
   --hero-bottom: var(--bg);
-  --hero-glow: rgba(255, 255, 255, 0.70);       /* ледяное белое свечение сверху */
-  --hero-b1: rgba(14, 150, 162, 0.58);          /* teal — доминанта */
-  --hero-b2: rgba(110, 192, 240, 0.66);         /* light blue */
-  --hero-b3: rgba(226, 248, 250, 0.75);         /* icy white highlight */
-  --hero-b4: rgba(10, 105, 125, 0.30);          /* deep teal */
-  --hero-sheen: rgba(255, 255, 255, 0.40);      /* диагональный технологичный блик */
+  --hero-glow: rgba(255, 255, 255, 0.70);       /* glow 1: ледяное белое свечение сверху */
+  --hero-glow-2: rgba(15, 95, 120, 0.18);       /* glow 2: глубокий синий в углу */
+  --hero-ribbon-a: rgba(13, 148, 160, 0.50);    /* ribbon A: teal — доминанта */
+  --hero-ribbon-b: rgba(100, 190, 240, 0.52);   /* ribbon B: light blue */
+  --hero-ribbon-c: rgba(255, 255, 255, 0.70);   /* ribbon C: почти белая подсветка */
   --hero-glass: rgba(255, 255, 255, 0.58);
   --hero-glass-border: rgba(255, 255, 255, 0.82);
   --hero-glass-shadow: 0 4px 14px rgba(32, 74, 91, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.9);
@@ -113,11 +113,10 @@ html[data-theme="sepia"] {
   --hero-top: #efe7d8;
   --hero-bottom: var(--bg);
   --hero-glow: rgba(255, 255, 255, 0.55);
-  --hero-b1: rgba(70, 170, 160, 0.36);
-  --hero-b2: rgba(212, 175, 55, 0.26);
-  --hero-b3: rgba(120, 195, 170, 0.28);
-  --hero-b4: rgba(180, 140, 60, 0.22);
-  --hero-sheen: rgba(255, 255, 255, 0.35);
+  --hero-glow-2: rgba(150, 120, 60, 0.16);
+  --hero-ribbon-a: rgba(70, 170, 160, 0.32);
+  --hero-ribbon-b: rgba(212, 175, 55, 0.22);
+  --hero-ribbon-c: rgba(255, 250, 240, 0.42);
   --hero-glass: rgba(255, 255, 255, 0.52);
   --hero-glass-border: rgba(255, 255, 255, 0.78);
   --hero-glass-shadow: 0 4px 14px rgba(61, 43, 31, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.85);
@@ -296,68 +295,121 @@ button, input, select, textarea {
 /* строка под значением («В среднем в сутки: 55 км») */
 .stat__note { margin-top: 6px; font-size: 12px; color: var(--muted); }
 
-/* ---------- Главная: immersive hero на fluid-фоне (по принципу Lex Finance) ----------
+/* ---------- Главная: живой flowing-фон hero (aurora ribbons + glow) ----------
    Слои: .home-ambient (0) < .screen--home (1) < .header (20) < nav/overlays.
-   Blob'ы — radial-gradient без filter:blur, анимируется только transform. */
+   .home-ambient жёстко ограничен высотой var(--hero-h) и overflow:hidden — сцена
+   не может залезть на секции ниже и не создаёт горизонтальный скролл независимо
+   от того, что дочерние ribbon/glow шире экрана.
+   5 независимых слоёв, каждый — свой transform-путь и своя длительность (не кратны
+   друг другу, чтобы не совпадать в цикле): glow-1 34s, glow-2 28s, ribbon-a 26s,
+   ribbon-b 22s, ribbon-c 30s (+ пульс прозрачности). Отрицательные animation-delay
+   стартуют каждый слой с разной фазы уже при первой отрисовке — нет ощущения
+   одновременного «старта» анимации. Анимируются только transform/opacity —
+   compositor-only, без repaint/layout; filter:blur — единственный статичный слой
+   (не участвует в анимации), мягкость формы в основном даёт сам radial-gradient
+   с вытянутым эллипсом (ellipse 46% 20% ...), а не тяжёлый blur. */
 
 .home-ambient {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--hero-h);
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
-  background:
-    radial-gradient(120% 60% at 50% 14%, var(--hero-glow) 0%, transparent 60%),
-    linear-gradient(180deg, var(--hero-top) 0%, var(--hero-bottom) var(--hero-h), var(--hero-bottom) 100%);
+  background: linear-gradient(180deg, var(--hero-top) 0%, var(--hero-bottom) 100%);
 }
-.ambient-blob {
+
+/* glow — мягкие радиальные пятна (ambient-свет сверху + глубина в углу) */
+.ambient-glow {
   position: absolute;
   display: block;
   border-radius: 50%;
+  will-change: transform, opacity;
+  transform: translate3d(0, 0, 0);
+}
+.glow-1 {
+  width: min(160vw, 580px); height: min(160vw, 580px);
+  left: -12%; top: -40%;
+  background: radial-gradient(circle at 50% 50%, var(--hero-glow) 0%, transparent 62%);
+  animation: glow-1-breathe 34s ease-in-out infinite;
+  animation-delay: -14s;
+}
+.glow-2 {
+  width: min(120vw, 440px); height: min(120vw, 440px);
+  right: -24%; top: 30%;
+  background: radial-gradient(circle at 50% 50%, var(--hero-glow-2) 0%, transparent 66%);
+  animation: glow-2-breathe 28s ease-in-out infinite;
+  animation-delay: -9s;
+}
+@keyframes glow-1-breathe {
+  0%   { transform: translate3d(0, 0, 0) scale(1); opacity: 0.9; }
+  50%  { transform: translate3d(3%, 2%, 0) scale(1.09); opacity: 1; }
+  100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.9; }
+}
+@keyframes glow-2-breathe {
+  0%   { transform: translate3d(0, 0, 0) scale(1); opacity: 0.8; }
+  50%  { transform: translate3d(-4%, -3%, 0) scale(0.93); opacity: 1; }
+  100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.8; }
+}
+
+/* ribbon — вытянутые световые волны (не круглые blob'ы): плоский эллипс, вытянутый
+   по горизонтали (ellipse 46% 20% ...), даёт мягко тающие края по всем сторонам
+   без жёсткого прямоугольника; лёгкий blur добавляет финальную мягкость. */
+.ambient-ribbon {
+  position: absolute;
+  display: block;
   will-change: transform;
   transform: translate3d(0, 0, 0);
 }
-.blob-1 {
-  width: min(150vw, 560px); height: min(150vw, 560px); right: -40%; top: -34%;
-  background: radial-gradient(circle at 50% 50%, var(--hero-b1) 0%, transparent 64%);
-  animation: hero-drift-1 22s ease-in-out infinite alternate;
+.ribbon-a {
+  width: min(200vw, 780px); height: 150px;
+  left: -32%; top: 56%;
+  background: radial-gradient(ellipse 46% 20% at 50% 50%, var(--hero-ribbon-a) 0%, transparent 72%);
+  filter: blur(24px);
+  animation: ribbon-a-flow 26s ease-in-out infinite;
+  animation-delay: -6s;
 }
-.blob-2 {
-  width: min(125vw, 480px); height: min(125vw, 480px); left: -44%; top: -8%;
-  background: radial-gradient(circle at 50% 50%, var(--hero-b2) 0%, transparent 64%);
-  animation: hero-drift-2 26s ease-in-out infinite alternate;
+.ribbon-b {
+  width: min(180vw, 700px); height: 130px;
+  right: -30%; top: 2%;
+  background: radial-gradient(ellipse 46% 20% at 50% 50%, var(--hero-ribbon-b) 0%, transparent 72%);
+  filter: blur(22px);
+  animation: ribbon-b-flow 22s ease-in-out infinite;
+  animation-delay: -16s;
 }
-.blob-3 {
-  width: min(95vw, 380px); height: min(95vw, 380px); left: 8%; top: 40px;
-  background: radial-gradient(circle at 50% 50%, var(--hero-b3) 0%, transparent 62%);
-  animation: hero-drift-3 30s ease-in-out infinite alternate;
+.ribbon-c {
+  width: min(160vw, 620px); height: 110px;
+  left: 2%; top: 26%;
+  background: radial-gradient(ellipse 44% 22% at 50% 50%, var(--hero-ribbon-c) 0%, transparent 74%);
+  filter: blur(20px);
+  opacity: 0.3;
+  animation: ribbon-c-pulse 30s ease-in-out infinite;
+  animation-delay: -21s;
 }
-.blob-4 {
-  width: min(100vw, 400px); height: min(100vw, 400px); right: -18%; top: 140px;
-  background: radial-gradient(circle at 50% 50%, var(--hero-b4) 0%, transparent 64%);
-  animation: hero-drift-4 17s ease-in-out infinite alternate;
+/* каждый путь замкнут: 0% === 100%, поэтому цикл не заметен */
+@keyframes ribbon-a-flow {
+  0%   { transform: translate3d(0%, 0%, 0) rotate(-26deg) scale(1); }
+  30%  { transform: translate3d(13%, -9%, 0) rotate(-18deg) scale(1.10); }
+  60%  { transform: translate3d(24%, 5%, 0) rotate(-31deg) scale(0.95); }
+  100% { transform: translate3d(0%, 0%, 0) rotate(-26deg) scale(1); }
 }
-/* тонкий диагональный блик — ощущение чистого стекла/лака */
-.ambient-sheen {
-  position: absolute;
-  left: 0; right: 0; top: 0;
-  height: var(--hero-h);
-  background: linear-gradient(112deg, transparent 34%, var(--hero-sheen) 47%, transparent 60%);
-  opacity: 0.9;
+@keyframes ribbon-b-flow {
+  0%   { transform: translate3d(0%, 0%, 0) rotate(17deg) scale(1.05); }
+  35%  { transform: translate3d(-17%, 8%, 0) rotate(25deg) scale(0.96); }
+  70%  { transform: translate3d(-7%, -11%, 0) rotate(11deg) scale(1.08); }
+  100% { transform: translate3d(0%, 0%, 0) rotate(17deg) scale(1.05); }
 }
-@keyframes hero-drift-1 { from { transform: translate3d(0, 0, 0) scale(1); }    to { transform: translate3d(46px, 34px, 0) scale(1.10); } }
-@keyframes hero-drift-2 { from { transform: translate3d(0, 0, 0) scale(1.06); } to { transform: translate3d(-54px, 28px, 0) scale(0.96); } }
-@keyframes hero-drift-3 { from { transform: translate3d(0, 0, 0) scale(0.98); } to { transform: translate3d(38px, -30px, 0) scale(1.08); } }
-@keyframes hero-drift-4 { from { transform: translate3d(0, 0, 0) scale(1); }    to { transform: translate3d(-30px, -42px, 0) scale(1.12); } }
-/* мягкий переход сцены в базовый фон — без резкой линии */
-.ambient-fade {
-  position: absolute;
-  left: 0; right: 0; top: 0;
-  height: var(--hero-h);
-  background: linear-gradient(180deg, transparent 50%, var(--hero-bottom) 100%);
+@keyframes ribbon-c-pulse {
+  0%   { transform: translate3d(0%, 5%, 0) rotate(-9deg) scale(0.94); opacity: 0.3; }
+  20%  { transform: translate3d(7%, -2%, 0) rotate(-4deg) scale(1.03); opacity: 0.6; }
+  50%  { transform: translate3d(17%, 4%, 0) rotate(3deg) scale(1.09); opacity: 0.16; }
+  80%  { transform: translate3d(5%, 9%, 0) rotate(-6deg) scale(0.98); opacity: 0.5; }
+  100% { transform: translate3d(0%, 5%, 0) rotate(-9deg) scale(0.94); opacity: 0.3; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .ambient-blob { animation: none; will-change: auto; }
+  .ambient-ribbon, .ambient-glow { animation: none; will-change: auto; }
 }
 
 /* контент Главной — над декоративным слоем */
