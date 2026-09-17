@@ -412,6 +412,28 @@ button, input, select, textarea {
   .ambient-ribbon, .ambient-glow { animation: none; will-change: auto; }
 }
 
+/* WebGL-слой «жидкой ткани» (HeroCanvas): один canvas строго в границах hero.
+   Пока не активен — прозрачен, видны CSS-ribbons. После активации плавно
+   проявляется, а CSS-слои гаснут и убираются из композитинга (visibility). */
+.hero-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  opacity: 0;
+  transition: opacity 0.9s ease;
+}
+.hero-canvas--on { opacity: 1; }
+.hero-canvas--on ~ .ambient-glow,
+.hero-canvas--on ~ .ambient-ribbon {
+  animation: none;
+  will-change: auto;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.9s ease, visibility 0s linear 0.9s;
+}
+
 /* контент Главной — над декоративным слоем */
 .app--immersive .screen--home { position: relative; z-index: 1; }
 

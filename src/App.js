@@ -3,6 +3,7 @@ import Header from "./components/Header";
 import BottomNav from "./components/BottomNav";
 import SideDrawer from "./components/SideDrawer";
 import GlobalSearch from "./components/GlobalSearch";
+import HeroCanvas from "./components/HeroCanvas";
 import HomeTab from "./tabs/HomeTab";
 import FuelTab from "./tabs/FuelTab";
 import ChartsTab from "./tabs/ChartsTab";
@@ -243,6 +244,8 @@ export default function App() {
     <div className={`app ${immersive ? "app--immersive" : ""}`}>
       {immersive && (
         <div className="home-ambient" aria-hidden="true">
+          {/* WebGL «жидкая ткань»; если не активируется — ниже остаются CSS-ribbons */}
+          <HeroCanvas theme={safeTheme} />
           <span className="ambient-glow glow-1" />
           <span className="ambient-glow glow-2" />
           <span className="ambient-ribbon ribbon-a" />
