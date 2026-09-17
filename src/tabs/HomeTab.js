@@ -1,5 +1,4 @@
 import React from "react";
-import Stat from "../components/Stat";
 import { lastOilChange } from "../vehicle";
 import { activeOilReminder } from "../serviceReminder";
 import {
@@ -40,12 +39,13 @@ export default function HomeTab({
 
   return (
     <main className="screen screen--home">
-      <div className="card hero">
-        <div className="hero__label">Текущий пробег</div>
-        <div className="hero__value">
-          {fmtKm(currentKm)} <span className="hero__unit">км</span>
+      {/* hero Главной: без карточки — пробег и два показателя лежат прямо на fluid-фоне */}
+      <section className="home-hero">
+        <div className="home-hero__label">Текущий пробег</div>
+        <div className="home-hero__value">
+          {fmtKm(currentKm)} <span className="home-hero__unit">км</span>
         </div>
-        <div className="hero__note">
+        <div className="home-hero__note">
           {kmFromFuel
             ? `Последняя заправка: ${fmtDate(kmFromFuel.date)}`
             : kmFromService
@@ -54,12 +54,21 @@ export default function HomeTab({
                 ? `Последняя заправка: ${fmtDate(lastFill.date)}`
                 : "Нет данных о пробеге"}
         </div>
-      </div>
-
-      <div className="grid-2" style={{ marginTop: 10 }}>
-        <Stat icon="⛽" label="Средний расход" value={fmtNum(avgConsumption, 2)} unit="л/100 км" color="var(--green)" />
-        <Stat icon="💶" label="Средняя цена" value={fmtNum(avgPrice, 3)} unit="€/л" color="var(--blue)" />
-      </div>
+        <div className="home-hero__stats">
+          <div className="home-hero__stat">
+            <div className="home-hero__stat-label"><span aria-hidden="true">⛽</span>Средний расход</div>
+            <div className="home-hero__stat-value" style={{ color: "var(--green)" }}>
+              {fmtNum(avgConsumption, 2)}<span className="home-hero__stat-unit">л/100 км</span>
+            </div>
+          </div>
+          <div className="home-hero__stat">
+            <div className="home-hero__stat-label"><span aria-hidden="true">💶</span>Средняя цена</div>
+            <div className="home-hero__stat-value" style={{ color: "var(--blue)" }}>
+              {fmtNum(avgPrice, 3)}<span className="home-hero__stat-unit">€/л</span>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {oil && (
         <>

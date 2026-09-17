@@ -101,6 +101,18 @@ export default function App() {
 
   const safeTheme = THEMES.includes(theme) ? theme : "light";
 
+  // immersive-режим Главной: декоративный fluid-фон под шапкой и hero-блоком,
+  // шапка прозрачная и становится «стеклом» только после прокрутки
+  const immersive = !page && tab === "home";
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    if (!immersive) return undefined;
+    const onScroll = () => setScrolled(window.scrollY > 12);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [immersive]);
+
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", safeTheme);
     const meta = document.querySelector('meta[name="theme-color"]');
@@ -228,7 +240,17 @@ export default function App() {
   const drawerActive = page || tab;
 
   return (
-    <div className="app">
+    <div className={`app ${immersive ? "app--immersive" : ""}`}>
+      {immersive && (
+        <div className="home-ambient" aria-hidden="true">
+          <span className="ambient-blob blob-1" />
+          <span className="ambient-blob blob-2" />
+          <span className="ambient-blob blob-3" />
+          <span className="ambient-blob blob-4" />
+          <span className="ambient-sheen" />
+          <span className="ambient-fade" />
+        </div>
+      )}
       {page === "vehicle" && (
         <VehiclePage
           vehicle={vehicle}
@@ -262,6 +284,8 @@ export default function App() {
         <>
           <Header
             title="Lexcar"
+            immersive={immersive}
+            scrolled={immersive && scrolled}
             onMenu={() => setDrawerOpen(true)}
             onSearch={() => setSearchOpen(true)}
           />

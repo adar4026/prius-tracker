@@ -29,6 +29,23 @@
   --nav-muted: #9a958c;
   --nav-active: #b39cff;
   --nav-active-soft: rgba(139, 110, 255, 0.22);
+
+  /* immersive hero Главной (по мотивам Lex Finance): fluid-фон из бирюзовых/голубых
+     пятен под прозрачной шапкой и показателями; в тёмной теме — приглушённый */
+  --hero-h: 380px;                              /* высота сцены с blob'ами (включая шапку) */
+  --hero-top: #0f181b;                          /* верх сцены */
+  --hero-bottom: var(--bg);                     /* базовый фон под остальными карточками */
+  --hero-glow: rgba(90, 190, 200, 0.10);        /* свечение сверху */
+  --hero-b1: rgba(14, 150, 162, 0.32);          /* teal — доминанта */
+  --hero-b2: rgba(90, 170, 230, 0.20);          /* light blue */
+  --hero-b3: rgba(150, 210, 220, 0.10);         /* icy highlight */
+  --hero-b4: rgba(10, 105, 125, 0.30);          /* deep teal */
+  --hero-sheen: rgba(255, 255, 255, 0.05);
+  --hero-glass: rgba(255, 255, 255, 0.08);
+  --hero-glass-border: rgba(255, 255, 255, 0.14);
+  --hero-glass-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  --hero-bar: rgba(15, 15, 15, 0.74);           /* стекло шапки после прокрутки */
+  --hero-value-shadow: 0 1px 8px rgba(0, 0, 0, 0.35);
 }
 
 /* светлая тема — «холодный голубой»: ледяной фон, почти белые карточки, бирюзовый акцент */
@@ -58,6 +75,21 @@ html[data-theme="light"] {
   --nav-muted: #6b7280;
   --nav-active: #6d4de6;
   --nav-active-soft: #ece7fd;
+
+  /* светлая основа + бирюзовый акцент Lexcar: мягкие голубые/мятные переливы */
+  --hero-top: #d9ecf4;                          /* icy white-blue */
+  --hero-bottom: var(--bg);
+  --hero-glow: rgba(255, 255, 255, 0.70);       /* ледяное белое свечение сверху */
+  --hero-b1: rgba(14, 150, 162, 0.58);          /* teal — доминанта */
+  --hero-b2: rgba(110, 192, 240, 0.66);         /* light blue */
+  --hero-b3: rgba(226, 248, 250, 0.75);         /* icy white highlight */
+  --hero-b4: rgba(10, 105, 125, 0.30);          /* deep teal */
+  --hero-sheen: rgba(255, 255, 255, 0.40);      /* диагональный технологичный блик */
+  --hero-glass: rgba(255, 255, 255, 0.58);
+  --hero-glass-border: rgba(255, 255, 255, 0.82);
+  --hero-glass-shadow: 0 4px 14px rgba(32, 74, 91, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --hero-bar: rgba(240, 248, 250, 0.72);
+  --hero-value-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
 html[data-theme="sepia"] {
@@ -77,6 +109,20 @@ html[data-theme="sepia"] {
   --nav-muted: #7a6a55;
   --nav-active: #6d4de6;
   --nav-active-soft: #e9e2fb;
+
+  --hero-top: #efe7d8;
+  --hero-bottom: var(--bg);
+  --hero-glow: rgba(255, 255, 255, 0.55);
+  --hero-b1: rgba(70, 170, 160, 0.36);
+  --hero-b2: rgba(212, 175, 55, 0.26);
+  --hero-b3: rgba(120, 195, 170, 0.28);
+  --hero-b4: rgba(180, 140, 60, 0.22);
+  --hero-sheen: rgba(255, 255, 255, 0.35);
+  --hero-glass: rgba(255, 255, 255, 0.52);
+  --hero-glass-border: rgba(255, 255, 255, 0.78);
+  --hero-glass-shadow: 0 4px 14px rgba(61, 43, 31, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  --hero-bar: rgba(245, 240, 232, 0.74);
+  --hero-value-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -104,6 +150,7 @@ button, input, select, textarea {
 /* ---------- каркас ---------- */
 
 .app {
+  position: relative;
   max-width: 480px;
   margin: 0 auto;
   min-height: 100vh;
@@ -122,6 +169,7 @@ button, input, select, textarea {
   padding: calc(env(safe-area-inset-top, 0px) + 6px) 10px 6px;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
+  transition: background 0.2s ease, box-shadow 0.2s ease;
 }
 
 .header__title {
@@ -247,6 +295,176 @@ button, input, select, textarea {
 .stat__unit { font-size: 12px; color: var(--muted); font-weight: 500; margin-left: 3px; }
 /* строка под значением («В среднем в сутки: 55 км») */
 .stat__note { margin-top: 6px; font-size: 12px; color: var(--muted); }
+
+/* ---------- Главная: immersive hero на fluid-фоне (по принципу Lex Finance) ----------
+   Слои: .home-ambient (0) < .screen--home (1) < .header (20) < nav/overlays.
+   Blob'ы — radial-gradient без filter:blur, анимируется только transform. */
+
+.home-ambient {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 60% at 50% 14%, var(--hero-glow) 0%, transparent 60%),
+    linear-gradient(180deg, var(--hero-top) 0%, var(--hero-bottom) var(--hero-h), var(--hero-bottom) 100%);
+}
+.ambient-blob {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+}
+.blob-1 {
+  width: min(150vw, 560px); height: min(150vw, 560px); right: -40%; top: -34%;
+  background: radial-gradient(circle at 50% 50%, var(--hero-b1) 0%, transparent 64%);
+  animation: hero-drift-1 22s ease-in-out infinite alternate;
+}
+.blob-2 {
+  width: min(125vw, 480px); height: min(125vw, 480px); left: -44%; top: -8%;
+  background: radial-gradient(circle at 50% 50%, var(--hero-b2) 0%, transparent 64%);
+  animation: hero-drift-2 26s ease-in-out infinite alternate;
+}
+.blob-3 {
+  width: min(95vw, 380px); height: min(95vw, 380px); left: 8%; top: 40px;
+  background: radial-gradient(circle at 50% 50%, var(--hero-b3) 0%, transparent 62%);
+  animation: hero-drift-3 30s ease-in-out infinite alternate;
+}
+.blob-4 {
+  width: min(100vw, 400px); height: min(100vw, 400px); right: -18%; top: 140px;
+  background: radial-gradient(circle at 50% 50%, var(--hero-b4) 0%, transparent 64%);
+  animation: hero-drift-4 17s ease-in-out infinite alternate;
+}
+/* тонкий диагональный блик — ощущение чистого стекла/лака */
+.ambient-sheen {
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: var(--hero-h);
+  background: linear-gradient(112deg, transparent 34%, var(--hero-sheen) 47%, transparent 60%);
+  opacity: 0.9;
+}
+@keyframes hero-drift-1 { from { transform: translate3d(0, 0, 0) scale(1); }    to { transform: translate3d(46px, 34px, 0) scale(1.10); } }
+@keyframes hero-drift-2 { from { transform: translate3d(0, 0, 0) scale(1.06); } to { transform: translate3d(-54px, 28px, 0) scale(0.96); } }
+@keyframes hero-drift-3 { from { transform: translate3d(0, 0, 0) scale(0.98); } to { transform: translate3d(38px, -30px, 0) scale(1.08); } }
+@keyframes hero-drift-4 { from { transform: translate3d(0, 0, 0) scale(1); }    to { transform: translate3d(-30px, -42px, 0) scale(1.12); } }
+/* мягкий переход сцены в базовый фон — без резкой линии */
+.ambient-fade {
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: var(--hero-h);
+  background: linear-gradient(180deg, transparent 50%, var(--hero-bottom) 100%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ambient-blob { animation: none; will-change: auto; }
+}
+
+/* контент Главной — над декоративным слоем */
+.app--immersive .screen--home { position: relative; z-index: 1; }
+
+/* шапка на Главной: прозрачная, без линии; после прокрутки — стекло */
+.header--immersive {
+  background: transparent;
+  border-bottom-color: transparent;
+}
+.header--immersive.header--scrolled {
+  background: var(--hero-bar);
+  box-shadow: 0 0.5px 0 var(--border);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  backdrop-filter: saturate(180%) blur(16px);
+}
+/* стеклянная капсула поиска */
+.header__btn--glass {
+  background: var(--hero-glass);
+  border: 1px solid var(--hero-glass-border);
+  box-shadow: var(--hero-glass-shadow);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+.header__btn--glass:active { background: var(--hero-glass); }
+
+/* hero: пробег без карточки, два компактных стеклянных показателя под ним */
+.home-hero {
+  text-align: center;
+  padding: 8px 0 6px;
+}
+.home-hero__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.2px;
+}
+.home-hero__value {
+  margin-top: 2px;
+  font-size: clamp(36px, 11.5vw, 48px);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -1.4px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+  text-shadow: var(--hero-value-shadow);
+}
+.home-hero__unit {
+  font-size: 0.42em;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+.home-hero__note {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+/* без фона/рамок/теней — просто встроены в hero, расход слева, цена справа */
+.home-hero__stats {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 22px;
+  padding: 0 6px;
+}
+.home-hero__stat {
+  min-width: 0;
+  flex: 1 1 0;
+}
+.home-hero__stat:last-child { text-align: right; }
+.home-hero__stat-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.home-hero__stat:last-child .home-hero__stat-label { justify-content: flex-end; }
+.home-hero__stat-value {
+  margin-top: 4px;
+  font-size: clamp(18px, 5.6vw, 23px);
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.home-hero__stat-unit {
+  margin-left: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+@media (max-width: 340px) {
+  .home-hero__stats { gap: 8px; padding: 0 2px; }
+  .home-hero__stat-label { font-size: 11px; }
+  .home-hero__stat-unit { font-size: 11px; margin-left: 3px; }
+}
 
 /* ---------- прогресс ---------- */
 
