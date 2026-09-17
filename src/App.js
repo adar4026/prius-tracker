@@ -361,7 +361,6 @@ export default function App() {
         vehicle={vehicle}
         photoUrl={photo.url}
         currentKm={currentKm}
-        version={APP_VERSION}
       />
 
       {searchOpen && (

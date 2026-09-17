@@ -1635,10 +1635,20 @@ html[data-theme="light"] .item--card.item--overdue {
   padding: 8px 10px 10px;
   border-top: 1px solid var(--border);
 }
-.drawer__version {
+.drawer__footer-info {
   padding: 8px 10px 0;
+}
+.drawer__footer-brand {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+.drawer__footer-updated {
+  margin-top: 2px;
   font-size: 11px;
   color: var(--muted);
+  opacity: 0.8;
 }
 
 /* ---------- внутренние страницы ---------- */
