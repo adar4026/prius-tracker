@@ -78,16 +78,17 @@ html[data-theme="light"] {
   --fuel: #f28c28;
   --fuel-soft: #ffe9d6;
 
-  --nav-bg: rgba(255, 255, 255, 0.24);
+  --nav-bg: rgba(255, 255, 255, 0.13);
   --nav-bg-solid: #ffffff;
-  --nav-border: rgba(25, 25, 35, 0.50);
-  --nav-glass-highlight: rgba(255, 255, 255, 0.55);
-  --nav-shadow: 0 8px 22px rgba(28, 32, 60, 0.10);
+  --nav-border: rgba(25, 25, 35, 0.42);
+  --nav-glass-highlight: rgba(255, 255, 255, 0.22);
+  --nav-blur: 9px;
+  --nav-shadow: 0 6px 18px rgba(28, 32, 60, 0.08);
   --nav-muted: #5b6472;
   --nav-active: #6d4de6;
-  --nav-active-soft: rgba(109, 77, 230, 0.14);
-  --nav-pill-border: rgba(255, 255, 255, 0.34);
-  --nav-pill-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.36), 0 3px 10px rgba(109, 77, 230, 0.12);
+  --nav-active-soft: rgba(109, 77, 230, 0.10);
+  --nav-pill-border: rgba(255, 255, 255, 0.30);
+  --nav-pill-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 3px 10px rgba(109, 77, 230, 0.08);
   --nav-badge-ring: rgba(255, 255, 255, 0.85);
 
   /* светлая основа + бирюзовый акцент Lexcar: холодная автомобильная палитра —
@@ -117,16 +118,17 @@ html[data-theme="sepia"] {
   --fuel: #e07a1f;
   --fuel-soft: rgba(224, 122, 31, 0.14);
 
-  --nav-bg: rgba(255, 250, 240, 0.26);
+  --nav-bg: rgba(255, 250, 240, 0.14);
   --nav-bg-solid: #fbf8f1;
-  --nav-border: rgba(61, 43, 31, 0.46);
-  --nav-glass-highlight: rgba(255, 255, 255, 0.50);
-  --nav-shadow: 0 8px 22px rgba(61, 43, 31, 0.12);
+  --nav-border: rgba(61, 43, 31, 0.40);
+  --nav-glass-highlight: rgba(255, 255, 255, 0.22);
+  --nav-blur: 9px;
+  --nav-shadow: 0 6px 18px rgba(61, 43, 31, 0.10);
   --nav-muted: #6f5f4b;
   --nav-active: #6d4de6;
-  --nav-active-soft: rgba(109, 77, 230, 0.14);
-  --nav-pill-border: rgba(255, 255, 255, 0.34);
-  --nav-pill-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34), 0 3px 10px rgba(109, 77, 230, 0.12);
+  --nav-active-soft: rgba(109, 77, 230, 0.10);
+  --nav-pill-border: rgba(255, 255, 255, 0.30);
+  --nav-pill-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.26), 0 3px 10px rgba(109, 77, 230, 0.08);
   --nav-badge-ring: rgba(255, 252, 246, 0.85);
 
   --hero-top: #efe7d8;
