@@ -165,9 +165,11 @@ export default function BottomNav({ tabs, active, onChange, badges = {} }) {
 
   const onPointerDown = useCallback((e) => {
     const s = g.current;
-    if (s.id !== null || !e.isPrimary || (e.pointerType === "mouse" && e.button !== 0)) return;
+    if (!e.isPrimary || (e.pointerType === "mouse" && e.button !== 0)) return;
     const inner = innerRef.current;
     if (!inner || indexRef.current < 0) return;
+    // «зависший» жест (pointerup пришёл мимо нас) — закрываем и начинаем новый
+    if (s.id !== null) settle(indexRef.current);
     clearTimeout(s.snapTimer);
     const r = inner.getBoundingClientRect();
     const count = countRef.current;
@@ -191,8 +193,9 @@ export default function BottomNav({ tabs, active, onChange, badges = {} }) {
       pillRef.current?.classList.add("nav__pill--live");
       schedule();
     }
-    try { inner.setPointerCapture(e.pointerId); } catch (_) { /* старый WebKit */ }
-  }, [schedule]);
+    // capture здесь НЕ берём: иначе pointerup/click ретаргетятся на капсулу и
+    // обычный tap по кнопке не доходит до onClick. Захватываем только при старте drag.
+  }, [schedule, settle]);
 
   const onPointerMove = useCallback((e) => {
     const s = g.current;
@@ -207,6 +210,7 @@ export default function BottomNav({ tabs, active, onChange, badges = {} }) {
       if (Math.abs(dy) > Math.abs(dx)) return;
       s.dragging = true;
       s.moved = true;
+      try { innerRef.current?.setPointerCapture(e.pointerId); } catch (_) { /* старый WebKit */ }
       // порог не должен давать рывок: сдвигаем начало ровно на порог, а не в
       // текущую точку — иначе быстрый flick теряет путь, пройденный в этом же событии
       s.startX += Math.sign(dx) * DRAG_THRESHOLD;
@@ -235,6 +239,14 @@ export default function BottomNav({ tabs, active, onChange, badges = {} }) {
     settle(indexRef.current); // возврат на текущую вкладку, маршрут не трогаем
   }, [settle]);
 
+  // без capture палец может уйти с капсулы до pointerup — гасим live-состояние;
+  // во время drag capture есть и pointerleave не приходит
+  const onPointerLeave = useCallback((e) => {
+    const s = g.current;
+    if (e.pointerId !== s.id || s.dragging) return;
+    settle(indexRef.current);
+  }, [settle]);
+
   useEffect(() => () => {
     const s = g.current;
     if (s.raf) cancelAnimationFrame(s.raf);
@@ -252,6 +264,7 @@ export default function BottomNav({ tabs, active, onChange, badges = {} }) {
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
+        onPointerLeave={onPointerLeave}
       >
         {index >= 0 && <span ref={pillRef} className="nav__pill" aria-hidden="true" />}
         {tabs.map((t) => {

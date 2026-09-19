@@ -33,10 +33,10 @@
   --nav-saturate: 150%;
   --nav-shadow: 0 8px 22px rgba(0, 0, 0, 0.40);
   --nav-muted: #a19c92;
-  --nav-active: #b39cff;
-  --nav-active-soft: rgba(139, 110, 255, 0.22);
-  --nav-pill-border: rgba(255, 255, 255, 0.14);
-  --nav-pill-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 3px 10px rgba(139, 110, 255, 0.12);
+  --nav-active: #bfaaff;
+  --nav-active-soft: rgba(139, 110, 255, 0.30);
+  --nav-pill-border: rgba(255, 255, 255, 0.18);
+  --nav-pill-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 3px 12px rgba(139, 110, 255, 0.20);
   --nav-badge-ring: rgba(22, 22, 26, 0.85);
   --nav-glint: rgba(255, 255, 255, 0.20);            /* блик под пальцем в live-состоянии pill */
   --nav-pill-edge-light: rgba(255, 255, 255, 0.18);  /* передний край при drag */
@@ -89,10 +89,10 @@ html[data-theme="light"] {
   --nav-saturate: 130%;
   --nav-shadow: 0 6px 18px rgba(28, 32, 60, 0.07);
   --nav-muted: #5b6472;
-  --nav-active: #6d4de6;
-  --nav-active-soft: rgba(109, 77, 230, 0.07);
-  --nav-pill-border: rgba(255, 255, 255, 0.24);
-  --nav-pill-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.20), 0 3px 10px rgba(109, 77, 230, 0.06);
+  --nav-active: #5b3ddc;
+  --nav-active-soft: rgba(109, 77, 230, 0.18);
+  --nav-pill-border: rgba(255, 255, 255, 0.36);
+  --nav-pill-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.30), 0 3px 12px rgba(109, 77, 230, 0.14);
   --nav-badge-ring: rgba(255, 255, 255, 0.85);
   --nav-glint: rgba(255, 255, 255, 0.42);
   --nav-pill-edge-light: rgba(255, 255, 255, 0.30);
@@ -133,10 +133,10 @@ html[data-theme="sepia"] {
   --nav-saturate: 130%;
   --nav-shadow: 0 6px 18px rgba(61, 43, 31, 0.09);
   --nav-muted: #6f5f4b;
-  --nav-active: #6d4de6;
-  --nav-active-soft: rgba(109, 77, 230, 0.07);
-  --nav-pill-border: rgba(255, 255, 255, 0.24);
-  --nav-pill-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.20), 0 3px 10px rgba(109, 77, 230, 0.06);
+  --nav-active: #5b3ddc;
+  --nav-active-soft: rgba(109, 77, 230, 0.18);
+  --nav-pill-border: rgba(255, 255, 255, 0.36);
+  --nav-pill-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.30), 0 3px 12px rgba(109, 77, 230, 0.14);
   --nav-badge-ring: rgba(255, 252, 246, 0.85);
   --nav-glint: rgba(255, 255, 255, 0.40);
   --nav-pill-edge-light: rgba(255, 255, 255, 0.28);
@@ -1220,7 +1220,9 @@ html[data-theme="light"] .filter-btn--active {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.nav__item--active .nav__label { font-weight: 600; }
+.nav__item--active .nav__label { font-weight: 700; }
+/* активная иконка — чуть более уверенный штрих; иконки stroke-only, заливка не меняется */
+.nav__item--active .nav__icon svg { stroke-width: 2.4; }
 @media (max-width: 340px) {
   .nav { left: 12px; right: 12px; }
   .nav__label { font-size: 10px; }
