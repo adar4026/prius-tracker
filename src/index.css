@@ -38,6 +38,9 @@
   --nav-pill-border: rgba(255, 255, 255, 0.14);
   --nav-pill-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 3px 10px rgba(139, 110, 255, 0.12);
   --nav-badge-ring: rgba(22, 22, 26, 0.85);
+  --nav-glint: rgba(255, 255, 255, 0.20);            /* блик под пальцем в live-состоянии pill */
+  --nav-pill-edge-light: rgba(255, 255, 255, 0.18);  /* передний край при drag */
+  --nav-pill-edge-dark: rgba(0, 0, 0, 0.16);         /* задний край при drag */
 
   /* immersive hero Главной: живой flowing-фон (aurora ribbons + glow) под прозрачной
      шапкой и показателями; в тёмной теме — приглушённый. Холодная автомобильная
@@ -91,6 +94,9 @@ html[data-theme="light"] {
   --nav-pill-border: rgba(255, 255, 255, 0.24);
   --nav-pill-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.20), 0 3px 10px rgba(109, 77, 230, 0.06);
   --nav-badge-ring: rgba(255, 255, 255, 0.85);
+  --nav-glint: rgba(255, 255, 255, 0.42);
+  --nav-pill-edge-light: rgba(255, 255, 255, 0.30);
+  --nav-pill-edge-dark: rgba(25, 25, 35, 0.05);
 
   /* светлая основа + бирюзовый акцент Lexcar: холодная автомобильная палитра —
      light blue / teal / icy white, чуть глубокого синего для глубины */
@@ -132,6 +138,9 @@ html[data-theme="sepia"] {
   --nav-pill-border: rgba(255, 255, 255, 0.24);
   --nav-pill-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.20), 0 3px 10px rgba(109, 77, 230, 0.06);
   --nav-badge-ring: rgba(255, 252, 246, 0.85);
+  --nav-glint: rgba(255, 255, 255, 0.40);
+  --nav-pill-edge-light: rgba(255, 255, 255, 0.28);
+  --nav-pill-edge-dark: rgba(61, 43, 31, 0.05);
 
   --hero-top: #efe7d8;
   --hero-bottom: var(--bg);
@@ -1102,6 +1111,8 @@ html[data-theme="light"] .filter-btn--active {
   -webkit-backdrop-filter: blur(var(--nav-blur)) saturate(var(--nav-saturate));
   backdrop-filter: blur(var(--nav-blur)) saturate(var(--nav-saturate));
   overflow: hidden;
+  /* drag pill — горизонтальный; вертикальный pan отдаём браузеру (scroll страницы) */
+  touch-action: pan-y;
 }
 /* без backdrop-filter стекло не работает — показываем плотную лёгкую капсулу */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
@@ -1121,6 +1132,58 @@ html[data-theme="light"] .filter-btn--active {
   transform: translateX(calc(var(--nav-index, 0) * 100%));
   transition: transform 0.2s cubic-bezier(0.32, 0.72, 0, 1);
   pointer-events: none;
+  overflow: hidden;
+}
+/* ---- «живое стекло» pill при удержании/drag (только CSS-имитация) ----
+   ::before — мягкий блик под пальцем (radial-gradient, позиция через --glint-x/--glint-y);
+   ::after  — подсветка переднего края и лёгкое затемнение заднего по направлению
+   движения (--drag-dir: 1 вправо / -1 влево), интенсивность — скорость (--drag-v).
+   Оба слоя декоративные, pointer-events: none, вне live-состояния невидимы. */
+.nav__pill::before,
+.nav__pill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.22s ease;
+}
+.nav__pill::before {
+  background: radial-gradient(
+    26px 22px at var(--glint-x, 50%) var(--glint-y, 50%),
+    var(--nav-glint) 0%,
+    transparent 72%
+  );
+}
+.nav__pill::after {
+  background: linear-gradient(
+    90deg,
+    var(--nav-pill-edge-dark) 0%,
+    transparent 38%,
+    transparent 62%,
+    var(--nav-pill-edge-light) 100%
+  );
+  transform: scaleX(var(--drag-dir, 1));
+}
+.nav__pill--live::before { opacity: 1; }
+.nav__pill--live::after { opacity: var(--drag-v, 0); }
+/* во время drag положение задаётся inline через translate3d — transition выключаем;
+   will-change только на время жеста */
+.nav__inner--dragging .nav__pill {
+  transition: none;
+  will-change: transform;
+}
+/* пружинное прилипание к ближайшей вкладке после отпускания (длительность = SNAP_MS в JS) */
+.nav__pill--snap {
+  transition: transform 0.38s cubic-bezier(0.22, 1.25, 0.36, 1);
+}
+/* предварительная подсветка вкладки, к которой ближе всего pill во время drag */
+.nav__item--preview { color: var(--nav-active); }
+@media (prefers-reduced-motion: reduce) {
+  .nav__pill::before,
+  .nav__pill::after { display: none; }
+  .nav__pill--snap { transition: transform 0.2s ease; }
 }
 .nav__item {
   position: relative;
