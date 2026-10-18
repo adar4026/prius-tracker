@@ -12,7 +12,7 @@ const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabi
  * кнопке ✕, свайпу влево и Escape.
  */
 export default function SideDrawer({
-  open, onClose, items, active, onSelect, vehicle, photoUrl, currentKm,
+  open, onClose, items, active, onSelect, vehicle, photoUrl, currentKm, version,
 }) {
   const panelRef = useRef(null);
   const closeRef = useRef(null);
@@ -172,8 +172,9 @@ export default function SideDrawer({
             <span className="drawer__item-label">Данные и настройки</span>
           </button>
           <div className="drawer__footer-info">
-            <div className="drawer__footer-brand">Lexcar · Версия 1.1.0</div>
-            <div className="drawer__footer-updated">Обновлено: сентябрь 2026</div>
+            {/* версия — из package.json (REACT_APP_VERSION), как на экране настроек */}
+            <div className="drawer__footer-brand">Lexcar{version ? ` · Версия ${version}` : ""}</div>
+            <div className="drawer__footer-updated">Обновлено: октябрь 2026</div>
           </div>
         </div>
       </div>
