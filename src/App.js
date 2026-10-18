@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Header from "./components/Header";
 import BottomNav from "./components/BottomNav";
+import useScrollChrome from "./components/useScrollChrome";
 import SideDrawer from "./components/SideDrawer";
 import GlobalSearch from "./components/GlobalSearch";
 import RoadBackground from "./components/RoadBackground";
@@ -105,14 +106,9 @@ export default function App() {
   // immersive-режим Главной: фон-дорога под шапкой и всем содержимым,
   // шапка прозрачная и становится «стеклом» только после прокрутки
   const immersive = !page && tab === "home";
-  const [scrolled, setScrolled] = useState(false);
-  useEffect(() => {
-    if (!immersive) return undefined;
-    const onScroll = () => setScrolled(window.scrollY > 12);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [immersive]);
+  // один обработчик прокрутки на шапку и сжатие нижней навигации
+  const navRef = useRef(null);
+  const scrolled = useScrollChrome(navRef, page || tab);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", safeTheme);
@@ -340,6 +336,7 @@ export default function App() {
         active={page ? null : tab}
         onChange={goTab}
         badges={{ reminders: overdue }}
+        navRef={navRef}
       />
 
       <SideDrawer

@@ -31,8 +31,13 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
  * блик под пальцем (--glint-x/--glint-y), подсветка переднего края
  * (--drag-dir/--drag-v) и лёгкое растяжение. Всё — CSS-имитация, реального
  * преломления контента под стеклом здесь нет.
+ *
+ * Сжатие при прокрутке ведёт useScrollChrome: он пишет прогресс 0..1 в
+ * --nav-p элемента navRef, а размеры капсулы и подписей считаются в CSS.
+ * На время жеста капсула помечается data-gesture — прогресс замораживается,
+ * чтобы геометрия, измеренная на pointerdown, оставалась верной.
  */
-export default function BottomNav({ tabs, active, onChange, badges = {} }) {
+export default function BottomNav({ tabs, active, onChange, badges = {}, navRef }) {
   const index = tabs.findIndex((t) => t.id === active);
   const innerRef = useRef(null);
   const pillRef = useRef(null);
@@ -131,6 +136,7 @@ export default function BottomNav({ tabs, active, onChange, badges = {} }) {
     if (s.raf) { cancelAnimationFrame(s.raf); s.raf = 0; }
     setPreview(-1);
     s.id = null;
+    navRef?.current?.removeAttribute("data-gesture");
     s.live = false;
     // click после drag (если браузер его вообще пошлёт) приходит сразу за pointerup;
     // после этого guard снимаем, чтобы не съесть следующий Enter/клик с клавиатуры
@@ -161,7 +167,7 @@ export default function BottomNav({ tabs, active, onChange, badges = {} }) {
       pill.style.removeProperty("--drag-dir");
       pill.style.removeProperty("--drag-v");
     }, s.reduceMotion ? 200 : SNAP_MS);
-  }, [setPreview]);
+  }, [setPreview, navRef]);
 
   const onPointerDown = useCallback((e) => {
     const s = g.current;
@@ -186,6 +192,7 @@ export default function BottomNav({ tabs, active, onChange, badges = {} }) {
     s.dragging = false;
     s.v = 0;
     s.id = e.pointerId;
+    navRef?.current?.setAttribute("data-gesture", "");
     // удержание прямо на pill сразу «оживляет» стекло; drag — из любой точки панели
     const inPill = e.clientX >= r.left + PAD + s.x && e.clientX <= r.left + PAD + s.x + s.pillW;
     if (inPill && !s.reduceMotion) {
@@ -195,7 +202,7 @@ export default function BottomNav({ tabs, active, onChange, badges = {} }) {
     }
     // capture здесь НЕ берём: иначе pointerup/click ретаргетятся на капсулу и
     // обычный tap по кнопке не доходит до onClick. Захватываем только при старте drag.
-  }, [schedule, settle]);
+  }, [schedule, settle, navRef]);
 
   const onPointerMove = useCallback((e) => {
     const s = g.current;
@@ -255,11 +262,11 @@ export default function BottomNav({ tabs, active, onChange, badges = {} }) {
   }, []);
 
   return (
-    <nav className="nav" aria-label="Разделы">
+    <nav ref={navRef} className="nav" aria-label="Разделы" style={{ "--nav-count": tabs.length }}>
       <div
         ref={innerRef}
         className="nav__inner"
-        style={{ "--nav-count": tabs.length, "--nav-index": index }}
+        style={{ "--nav-index": index }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}

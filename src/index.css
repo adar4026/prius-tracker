@@ -23,6 +23,9 @@
   /* плавающая нижняя панель: высота капсулы и её отступ от низа экрана */
   --nav-h: 64px;
   --nav-gap: 10px;
+  /* компактная капсула при прокрутке вниз: высота и ширина колонки вкладки */
+  --nav-h-compact: 56px;
+  --nav-item-compact: 48px;
   /* материал капсулы — прозрачное матовое стекло: фон только через rgba,
      чтобы просвечивал контент; --nav-bg-solid — непрозрачный fallback без backdrop-filter */
   --nav-bg: rgba(30, 30, 36, 0.42);
@@ -1077,20 +1080,36 @@ html[data-theme="light"] .filter-btn--active {
 
 /* ---------- нижняя навигация: плавающая капсула ---------- */
 
+/* --nav-p (0..1) пишет useScrollChrome по фактической прокрутке: 0 — капсула
+   раскрыта, 1 — компактная. Ширина, высота и подписи интерполируются прямо из
+   него, без transition — капсула идёт за жестом и не доигрывает анимацию сама.
+   Отступ контента (.app padding-bottom) считается по полной --nav-h и не
+   меняется: иначе страница перестраивалась бы на каждом кадре прокрутки. */
 .nav {
+  --nav-p: 0;
+  --nav-side: 14px;
+  --nav-w-full: min(100% - var(--nav-side) * 2, 480px - 28px);
+  /* колонки + padding 7px×2 + border 1px×2 */
+  --nav-w-compact: calc(var(--nav-item-compact) * var(--nav-count, 5) + 16px);
   position: fixed;
   bottom: calc(var(--nav-gap) + env(safe-area-inset-bottom, 0px));
-  left: 14px;
-  right: 14px;
+  left: 0;
+  right: 0;
   z-index: 30;
-  max-width: calc(480px - 28px);
+  /* left/right 0 + width + margin auto — капсула центрирована при любой ширине */
+  width: min(
+    var(--nav-w-full),
+    calc(var(--nav-w-full) + (var(--nav-w-compact) - var(--nav-w-full)) * var(--nav-p))
+  );
   margin: 0 auto;
 }
 .nav__inner {
   position: relative;
   display: grid;
   grid-template-columns: repeat(var(--nav-count, 5), minmax(0, 1fr));
-  height: var(--nav-h);
+  height: calc(var(--nav-h) + (var(--nav-h-compact) - var(--nav-h)) * var(--nav-p));
+  /* размер капсулы меняется на каждом кадре прокрутки — пересчёт не выходит наружу */
+  contain: layout;
   padding: 7px;
   border-radius: 32px;
   /* прозрачное матовое стекло: минимальная заливка + тонкий контур + умеренный blur.
@@ -1200,22 +1219,27 @@ html[data-theme="light"] .filter-btn--active {
   position: relative;
   display: flex;
   line-height: 0;
+  /* по мере исчезновения подписи иконка съезжает в центр колонки:
+     половина высоты подписи (11px × 1.1) + gap 3px */
+  transform: translateY(calc(7.5px * var(--nav-p)));
 }
+/* подпись не обрезается многоточием: она гаснет к середине сжатия, пока
+   колонка ещё шире текста, и уходит вниз вслед за иконкой */
 .nav__label {
-  max-width: 100%;
   font-size: 11px;
   font-weight: 600;
   line-height: 1.1;
   letter-spacing: 0;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* значение вне [0, 1] opacity зажимает сама — max() не нужен */
+  opacity: calc(1 - var(--nav-p) * 2);
+  transform: translateY(calc(5px * var(--nav-p)));
 }
 .nav__item--active .nav__label { font-weight: 700; }
 /* активная иконка — чуть более уверенный штрих; иконки stroke-only, заливка не меняется */
 .nav__item--active .nav__icon svg { stroke-width: 2.4; }
 @media (max-width: 340px) {
-  .nav { left: 12px; right: 12px; }
+  .nav { --nav-side: 12px; }
   .nav__label { font-size: 10.5px; }
 }
 
