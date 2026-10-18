@@ -5,7 +5,7 @@ import { BackIcon, MenuIcon, SearchIcon } from "./Icons";
  * Верхняя панель. На основных вкладках: [☰] Lexcar [⌕].
  * На внутренних страницах: [←] Заголовок и, при необходимости, действие справа.
  * immersive — шапка Главной: прозрачная, без разделителя, лежит прямо на
- * fluid-фоне; scrolled — после прокрутки становится стеклянной.
+ * фоне-дороге; scrolled — после прокрутки становится стеклянной.
  */
 export default function Header({
   title, onMenu, onBack, onSearch, action, immersive = false, scrolled = false,

@@ -42,17 +42,16 @@
   --nav-pill-edge-light: rgba(255, 255, 255, 0.18);  /* передний край при drag */
   --nav-pill-edge-dark: rgba(0, 0, 0, 0.16);         /* задний край при drag */
 
-  /* immersive hero Главной: живой flowing-фон (aurora ribbons + glow) под прозрачной
-     шапкой и показателями; в тёмной теме — приглушённый. Холодная автомобильная
-     палитра (teal/light blue/icy white) — своя, отдельная от Lex Finance. */
-  --hero-h: 380px;                              /* высота сцены (включая шапку), строго клипуется */
-  --hero-top: #0f181b;                          /* верх сцены */
-  --hero-bottom: var(--bg);                     /* базовый фон под остальными карточками */
-  --hero-glow: rgba(90, 190, 200, 0.10);        /* glow 1: мягкое свечение сверху */
-  --hero-glow-2: rgba(10, 105, 125, 0.26);      /* glow 2: глубина в углу */
-  --hero-ribbon-a: rgba(14, 150, 162, 0.30);    /* ribbon A: teal — доминанта */
-  --hero-ribbon-b: rgba(90, 170, 230, 0.20);    /* ribbon B: light blue */
-  --hero-ribbon-c: rgba(190, 228, 232, 0.16);   /* ribbon C: ледяная подсветка */
+  /* immersive Главной: фон-дорога (RoadBackground) под прозрачной шапкой и
+     показателями. Тёмная тема приглушает снимок общим тоном, светлые — нет;
+     вуали — цвета фона темы, ради читаемости hero. */
+  --road-filter: saturate(0.85);
+  --road-shade: rgba(8, 12, 18, 0.52);
+  --road-veil-top: rgba(15, 15, 15, 0.62);
+  --road-veil-mid: rgba(15, 15, 15, 0.30);
+  --road-veil-haze: rgba(15, 15, 15, 0.18);    /* лёгкая дымка над датой, дорога видна */
+  --road-veil-low: rgba(15, 15, 15, 0.52);     /* подложка под показателями */
+  --road-hero-muted: #b3ab9c;                  /* приглушённый текст hero на небе */
   --hero-glass: rgba(255, 255, 255, 0.08);
   --hero-glass-border: rgba(255, 255, 255, 0.14);
   --hero-glass-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
@@ -98,15 +97,14 @@ html[data-theme="light"] {
   --nav-pill-edge-light: rgba(255, 255, 255, 0.30);
   --nav-pill-edge-dark: rgba(25, 25, 35, 0.05);
 
-  /* светлая основа + бирюзовый акцент Lexcar: холодная автомобильная палитра —
-     light blue / teal / icy white, чуть глубокого синего для глубины */
-  --hero-top: #d9ecf4;                          /* icy white-blue */
-  --hero-bottom: var(--bg);
-  --hero-glow: rgba(255, 255, 255, 0.70);       /* glow 1: ледяное белое свечение сверху */
-  --hero-glow-2: rgba(15, 95, 120, 0.18);       /* glow 2: глубокий синий в углу */
-  --hero-ribbon-a: rgba(13, 148, 160, 0.50);    /* ribbon A: teal — доминанта */
-  --hero-ribbon-b: rgba(100, 190, 240, 0.52);   /* ribbon B: light blue */
-  --hero-ribbon-c: rgba(255, 255, 255, 0.70);   /* ribbon C: почти белая подсветка */
+  /* снимок как есть: ледяная вуаль под текстом hero */
+  --road-filter: none;
+  --road-shade: transparent;
+  --road-veil-top: rgba(234, 244, 247, 0.80);
+  --road-veil-mid: rgba(234, 244, 247, 0.45);
+  --road-veil-haze: rgba(234, 244, 247, 0.22);
+  --road-veil-low: rgba(234, 244, 247, 0.64);
+  --road-hero-muted: #3f5866;
   --hero-glass: rgba(255, 255, 255, 0.58);
   --hero-glass-border: rgba(255, 255, 255, 0.82);
   --hero-glass-shadow: 0 4px 14px rgba(32, 74, 91, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.9);
@@ -142,13 +140,14 @@ html[data-theme="sepia"] {
   --nav-pill-edge-light: rgba(255, 255, 255, 0.28);
   --nav-pill-edge-dark: rgba(61, 43, 31, 0.05);
 
-  --hero-top: #efe7d8;
-  --hero-bottom: var(--bg);
-  --hero-glow: rgba(255, 255, 255, 0.55);
-  --hero-glow-2: rgba(150, 120, 60, 0.16);
-  --hero-ribbon-a: rgba(70, 170, 160, 0.32);
-  --hero-ribbon-b: rgba(212, 175, 55, 0.22);
-  --hero-ribbon-c: rgba(255, 250, 240, 0.42);
+  /* тот же снимок, тонированный под сепию */
+  --road-filter: sepia(0.55) saturate(0.8) brightness(1.04);
+  --road-shade: rgba(245, 240, 232, 0.12);
+  --road-veil-top: rgba(245, 240, 232, 0.80);
+  --road-veil-mid: rgba(245, 240, 232, 0.45);
+  --road-veil-haze: rgba(245, 240, 232, 0.22);
+  --road-veil-low: rgba(245, 240, 232, 0.64);
+  --road-hero-muted: #5e4e3b;
   --hero-glass: rgba(255, 255, 255, 0.52);
   --hero-glass-border: rgba(255, 255, 255, 0.78);
   --hero-glass-shadow: 0 4px 14px rgba(61, 43, 31, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.85);
@@ -327,144 +326,123 @@ button, input, select, textarea {
 /* строка под значением («В среднем в сутки: 55 км») */
 .stat__note { margin-top: 6px; font-size: 12px; color: var(--muted); }
 
-/* ---------- Главная: живой flowing-фон hero (aurora ribbons + glow) ----------
-   Слои: .home-ambient (0) < .screen--home (1) < .header (20) < nav/overlays.
-   .home-ambient жёстко ограничен высотой var(--hero-h) и overflow:hidden — сцена
-   не может залезть на секции ниже и не создаёт горизонтальный скролл независимо
-   от того, что дочерние ribbon/glow шире экрана.
-   5 независимых слоёв, каждый — свой transform-путь и своя длительность (не кратны
-   друг другу, чтобы не совпадать в цикле): glow-1 34s, glow-2 28s, ribbon-a 26s,
-   ribbon-b 22s, ribbon-c 30s (+ пульс прозрачности). Отрицательные animation-delay
-   стартуют каждый слой с разной фазы уже при первой отрисовке — нет ощущения
-   одновременного «старта» анимации. Анимируются только transform/opacity —
-   compositor-only, без repaint/layout; filter:blur — единственный статичный слой
-   (не участвует в анимации), мягкость формы в основном даёт сам radial-gradient
-   с вытянутым эллипсом (ellipse 46% 20% ...), а не тяжёлый blur. */
+/* ---------- Главная: фон-дорога (RoadBackground) ----------
+   Слои: .home-road (0) < .screen--home (1) < .header (20) < nav/overlays.
+   Пейзаж — только hero-зона: от шапки до показателей топлива. Слой absolute
+   у верха .app и прокручивается вместе с hero; ниже показателей маска плавно
+   растворяет его в фон страницы, поэтому к «Замене масла» дороги уже нет.
+   Событий не ловит — pointer-events: none.
+   Композиция привязана к hero, а не к краям снимка: .home-road__scene держит
+   ширину колонки (×--road-zoom, прижата вправо — солнце на снимке справа) и
+   слегка сжата по высоте (--road-squash), чтобы горизонт, изгиб и передний план
+   поместились между шапкой и показателями. Вертикально сцена сдвинута так, что
+   солнце (28% высоты снимка) стоит на --road-sun-y от верха hero, у подписи
+   пробега справа. Высота сцены задана через padding-top, а сдвиг — через
+   margin-top: оба в процентах считаются от ширины, поэтому композиция одинакова
+   на любой ширине экрана. Под пробегом — изгиб дороги к горизонту, перед
+   показателями — передний план с разметкой; дальше всё растворяется в фон.
+   Движение — только два мягких световых слоя (opacity/transform, compositor-only):
+   «дыхание» солнца и медленный дрейф тумана в долине; prefers-reduced-motion
+   их останавливает. Сам снимок не двигается. */
 
-.home-ambient {
+.home-road {
+  --road-zoom: 1;        /* > 1 — крупнее и правее; 1 — снимок во всю ширину колонки */
+  --road-squash: 0.85;   /* сжатие снимка по высоте: дорога целиком в hero */
+  --road-sun-y: 80px;    /* центр солнца: у подписи «Текущий пробег», справа */
+  --road-h: 345px;       /* высота зоны пейзажа от верха hero (до «Замены масла») */
+  --road-fade: 140px;    /* растворение в фон страницы: от переднего плана до подписи секции */
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: var(--hero-h);
+  height: calc(env(safe-area-inset-top, 0px) + var(--road-h));
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
-  background: linear-gradient(180deg, var(--hero-top) 0%, var(--hero-bottom) 100%);
+  /* пока снимок грузится — те же небо, горизонт и дорога градиентом */
+  background: linear-gradient(180deg, #4ea6e6 0%, #a9d3f0 34%, #6f9fd0 52%, #3d68a6 80%);
+  /* растворение по плавной S-кривой (≈ smoothstep): пейзаж мягко тает в дымку
+     цвета фона, без заметной границы начала и конца перехода */
+  --road-mask: linear-gradient(180deg,
+    #000 calc(100% - var(--road-fade)),
+    rgba(0, 0, 0, 0.82) calc(100% - var(--road-fade) * 0.72),
+    rgba(0, 0, 0, 0.45) calc(100% - var(--road-fade) * 0.45),
+    rgba(0, 0, 0, 0.12) calc(100% - var(--road-fade) * 0.2),
+    transparent 100%);
+  -webkit-mask-image: var(--road-mask);
+  mask-image: var(--road-mask);
 }
-
-/* glow — мягкие радиальные пятна (ambient-свет сверху + глубина в углу) */
-.ambient-glow {
+.home-road__scene {
   position: absolute;
-  display: block;
+  top: calc(env(safe-area-inset-top, 0px) + var(--road-sun-y));
+  right: 0;
+  /* высота сцены в % ширины колонки (padding/margin в % считаются от ширины) */
+  --road-scene-h: calc(var(--road-zoom) * 100% * 1672 / 940 * var(--road-squash));
+  width: calc(var(--road-zoom) * 100%);
+  height: 0;
+  padding-top: var(--road-scene-h);
+  margin-top: calc(var(--road-scene-h) * -0.28);
+  background: var(--road-img) center / 100% 100% no-repeat;
+  filter: var(--road-filter);
+}
+/* тёплое свечение рассвета точно над солнцем снимка (81.7% / 28%) */
+.home-road__sun {
+  position: absolute;
+  left: 81.7%;
+  top: 28%;
+  width: 70%;
+  aspect-ratio: 1;
   border-radius: 50%;
-  will-change: transform, opacity;
-  transform: translate3d(0, 0, 0);
+  background: radial-gradient(circle, rgba(255, 236, 196, 0.55) 0%, rgba(255, 214, 160, 0.20) 30%, transparent 62%);
+  transform: translate(-50%, -50%);
+  opacity: 0.7;
+  will-change: opacity;
+  animation: road-sun 16s ease-in-out infinite;
 }
-.glow-1 {
-  width: min(160vw, 580px); height: min(160vw, 580px);
-  left: -12%; top: -40%;
-  background: radial-gradient(circle at 50% 50%, var(--hero-glow) 0%, transparent 62%);
-  animation: glow-1-breathe 34s ease-in-out infinite;
-  animation-delay: -14s;
-}
-.glow-2 {
-  width: min(120vw, 440px); height: min(120vw, 440px);
-  right: -24%; top: 30%;
-  background: radial-gradient(circle at 50% 50%, var(--hero-glow-2) 0%, transparent 66%);
-  animation: glow-2-breathe 28s ease-in-out infinite;
-  animation-delay: -9s;
-}
-@keyframes glow-1-breathe {
-  0%   { transform: translate3d(0, 0, 0) scale(1); opacity: 0.9; }
-  50%  { transform: translate3d(3%, 2%, 0) scale(1.09); opacity: 1; }
-  100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.9; }
-}
-@keyframes glow-2-breathe {
-  0%   { transform: translate3d(0, 0, 0) scale(1); opacity: 0.8; }
-  50%  { transform: translate3d(-4%, -3%, 0) scale(0.93); opacity: 1; }
-  100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.8; }
-}
-
-/* ribbon — вытянутые световые волны (не круглые blob'ы): плоский эллипс, вытянутый
-   по горизонтали (ellipse 46% 20% ...), даёт мягко тающие края по всем сторонам
-   без жёсткого прямоугольника; лёгкий blur добавляет финальную мягкость. */
-.ambient-ribbon {
+/* полоса тумана в долине: едва заметно смещается по горизонтали */
+.home-road__mist {
   position: absolute;
-  display: block;
-  will-change: transform;
-  transform: translate3d(0, 0, 0);
+  left: -15%;
+  top: 34%;
+  width: 90%;
+  height: 12%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(235, 246, 252, 0.42) 0%, transparent 72%);
+  will-change: transform, opacity;
+  animation: road-mist 48s ease-in-out infinite;
+  animation-delay: -12s;
 }
-.ribbon-a {
-  width: min(200vw, 780px); height: 150px;
-  left: -32%; top: 56%;
-  background: radial-gradient(ellipse 46% 20% at 50% 50%, var(--hero-ribbon-a) 0%, transparent 72%);
-  filter: blur(24px);
-  animation: ribbon-a-flow 26s ease-in-out infinite;
-  animation-delay: -6s;
+@keyframes road-sun {
+  0%, 100% { opacity: 0.6; }
+  50%      { opacity: 1; }
 }
-.ribbon-b {
-  width: min(180vw, 700px); height: 130px;
-  right: -30%; top: 2%;
-  background: radial-gradient(ellipse 46% 20% at 50% 50%, var(--hero-ribbon-b) 0%, transparent 72%);
-  filter: blur(22px);
-  animation: ribbon-b-flow 22s ease-in-out infinite;
-  animation-delay: -16s;
-}
-.ribbon-c {
-  width: min(160vw, 620px); height: 110px;
-  left: 2%; top: 26%;
-  background: radial-gradient(ellipse 44% 22% at 50% 50%, var(--hero-ribbon-c) 0%, transparent 74%);
-  filter: blur(20px);
-  opacity: 0.3;
-  animation: ribbon-c-pulse 30s ease-in-out infinite;
-  animation-delay: -21s;
-}
-/* каждый путь замкнут: 0% === 100%, поэтому цикл не заметен */
-@keyframes ribbon-a-flow {
-  0%   { transform: translate3d(0%, 0%, 0) rotate(-26deg) scale(1); }
-  30%  { transform: translate3d(13%, -9%, 0) rotate(-18deg) scale(1.10); }
-  60%  { transform: translate3d(24%, 5%, 0) rotate(-31deg) scale(0.95); }
-  100% { transform: translate3d(0%, 0%, 0) rotate(-26deg) scale(1); }
-}
-@keyframes ribbon-b-flow {
-  0%   { transform: translate3d(0%, 0%, 0) rotate(17deg) scale(1.05); }
-  35%  { transform: translate3d(-17%, 8%, 0) rotate(25deg) scale(0.96); }
-  70%  { transform: translate3d(-7%, -11%, 0) rotate(11deg) scale(1.08); }
-  100% { transform: translate3d(0%, 0%, 0) rotate(17deg) scale(1.05); }
-}
-@keyframes ribbon-c-pulse {
-  0%   { transform: translate3d(0%, 5%, 0) rotate(-9deg) scale(0.94); opacity: 0.3; }
-  20%  { transform: translate3d(7%, -2%, 0) rotate(-4deg) scale(1.03); opacity: 0.6; }
-  50%  { transform: translate3d(17%, 4%, 0) rotate(3deg) scale(1.09); opacity: 0.16; }
-  80%  { transform: translate3d(5%, 9%, 0) rotate(-6deg) scale(0.98); opacity: 0.5; }
-  100% { transform: translate3d(0%, 5%, 0) rotate(-9deg) scale(0.94); opacity: 0.3; }
+@keyframes road-mist {
+  0%, 100% { transform: translate3d(0, 0, 0); opacity: 0.55; }
+  50%      { transform: translate3d(9%, -4%, 0); opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .ambient-ribbon, .ambient-glow { animation: none; will-change: auto; }
+  .home-road__sun, .home-road__mist { animation: none; will-change: auto; }
 }
-
-/* WebGL-слой «жидкой ткани» (HeroCanvas): один canvas строго в границах hero.
-   Пока не активен — прозрачен, видны CSS-ribbons. После активации плавно
-   проявляется, а CSS-слои гаснут и убираются из композитинга (visibility). */
-.hero-canvas {
+/* читаемость: дымка цвета темы под шапкой и пробегом, лёгкая дымка над датой
+   и изгибом (дорога остаётся видна), плотнее — под показателями, чтобы яркий
+   асфальт и разметка не спорили с цифрами; плюс общий тон для тёмной темы */
+.home-road__veil {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-  opacity: 0;
-  transition: opacity 0.9s ease;
+  background:
+    linear-gradient(180deg,
+      var(--road-veil-top) 0%,
+      var(--road-veil-mid) 30%,
+      var(--road-veil-mid) 42%,
+      var(--road-veil-haze) 56%,
+      var(--road-veil-haze) 64%,
+      var(--road-veil-low) 78%,
+      var(--road-veil-low) 100%),
+    linear-gradient(var(--road-shade), var(--road-shade));
 }
-.hero-canvas--on { opacity: 1; }
-.hero-canvas--on ~ .ambient-glow,
-.hero-canvas--on ~ .ambient-ribbon {
-  animation: none;
-  will-change: auto;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.9s ease, visibility 0s linear 0.9s;
-}
+
+/* hero на пейзаже: приглушённый текст контрастнее обычного */
+.app--immersive .home-hero { --muted: var(--road-hero-muted); }
 
 /* контент Главной — над декоративным слоем */
 .app--immersive .screen--home { position: relative; z-index: 1; }
@@ -493,7 +471,7 @@ button, input, select, textarea {
 /* hero: пробег без карточки, два компактных стеклянных показателя под ним */
 .home-hero {
   text-align: center;
-  padding: 8px 0 6px;
+  padding: 18px 0 6px;
 }
 .home-hero__label {
   font-size: 13px;
@@ -531,7 +509,7 @@ button, input, select, textarea {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 22px;
+  margin-top: 82px;   /* между датой и показателями открыт передний план дороги */
   padding: 0 6px;
 }
 .home-hero__stat {

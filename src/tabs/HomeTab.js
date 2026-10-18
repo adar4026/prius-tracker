@@ -39,7 +39,7 @@ export default function HomeTab({
 
   return (
     <main className="screen screen--home">
-      {/* hero Главной: без карточки — пробег и два показателя лежат прямо на fluid-фоне */}
+      {/* hero Главной: без карточки — пробег и два показателя лежат прямо на фоне-дороге */}
       <section className="home-hero">
         <div className="home-hero__label">Текущий пробег</div>
         <div className="home-hero__value">

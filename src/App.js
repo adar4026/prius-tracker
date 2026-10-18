@@ -3,7 +3,7 @@ import Header from "./components/Header";
 import BottomNav from "./components/BottomNav";
 import SideDrawer from "./components/SideDrawer";
 import GlobalSearch from "./components/GlobalSearch";
-import HeroCanvas from "./components/HeroCanvas";
+import RoadBackground from "./components/RoadBackground";
 import HomeTab from "./tabs/HomeTab";
 import FuelTab from "./tabs/FuelTab";
 import ChartsTab from "./tabs/ChartsTab";
@@ -102,7 +102,7 @@ export default function App() {
 
   const safeTheme = THEMES.includes(theme) ? theme : "light";
 
-  // immersive-режим Главной: декоративный fluid-фон под шапкой и hero-блоком,
+  // immersive-режим Главной: фон-дорога под шапкой и всем содержимым,
   // шапка прозрачная и становится «стеклом» только после прокрутки
   const immersive = !page && tab === "home";
   const [scrolled, setScrolled] = useState(false);
@@ -242,17 +242,7 @@ export default function App() {
 
   return (
     <div className={`app ${immersive ? "app--immersive" : ""}`}>
-      {immersive && (
-        <div className="home-ambient" aria-hidden="true">
-          {/* WebGL «жидкая ткань»; если не активируется — ниже остаются CSS-ribbons */}
-          <HeroCanvas theme={safeTheme} />
-          <span className="ambient-glow glow-1" />
-          <span className="ambient-glow glow-2" />
-          <span className="ambient-ribbon ribbon-a" />
-          <span className="ambient-ribbon ribbon-b" />
-          <span className="ambient-ribbon ribbon-c" />
-        </div>
-      )}
+      {immersive && <RoadBackground />}
       {page === "vehicle" && (
         <VehiclePage
           vehicle={vehicle}
